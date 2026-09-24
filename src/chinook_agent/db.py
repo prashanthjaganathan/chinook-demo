@@ -57,6 +57,26 @@ ORDER BY CAST(album_tracks.owned_tracks AS REAL) / album_tracks.total_tracks DES
          al.Title
 """
 
+# Given a customer and an album, return every track on that album the customer does not already own, 
+# with the format and price of each track.
+MISSING_TRACKS_SQL = """
+SELECT
+    t.TrackId AS track_id,
+    t.Name AS track,
+    m.Name AS media_type,
+    t.UnitPrice AS unit_price
+FROM Track t
+JOIN MediaType m ON m.MediaTypeId = t.MediaTypeId
+WHERE NOT EXISTS (
+        SELECT 1
+        FROM Invoice i
+        JOIN InvoiceLine il ON il.InvoiceId = i.InvoiceId
+        WHERE i.CustomerId = ? AND il.TrackId = t.TrackId
+      )
+  AND t.AlbumId = ?
+ORDER BY t.TrackId
+"""
+
 
 def connect() -> sqlite3.Connection:
     connection = sqlite3.connect(f"{DB_PATH.as_uri()}?mode=ro", uri=True)
@@ -92,3 +112,13 @@ def get_library(customer_id: int) -> list[dict]:
 
 def partial_albums(customer_id: int) -> list[dict]:
     return query(PARTIAL_ALBUMS_SQL, (valid_id(customer_id, "customer_id"),))
+
+
+def missing_tracks(customer_id: int, album_id: int) -> list[dict]:
+    rows = query(
+        MISSING_TRACKS_SQL,
+        (valid_id(customer_id, "customer_id"), valid_id(album_id, "album_id")),
+    )
+    for row in rows:
+        row["unit_price"] = money(row["unit_price"])
+    return rows
