@@ -1,2 +1,11 @@
 CHINOOK_EDA_REPORT.md
 CHINOOK_PRIOR_ART_RESEARCH.md
+langchain_de_interview_report.md
+CHINOOK_AGENT_BUILD_PLAN.md
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+*.egg-info/
+data/*.db
+data/*.sqlite
