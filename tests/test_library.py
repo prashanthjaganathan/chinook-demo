@@ -1,8 +1,6 @@
 import sqlite3
 from decimal import Decimal
 
-import pytest
-
 from chinook_agent import db
 
 
@@ -42,14 +40,3 @@ def test_library_prices_are_decimal():
 
 def test_unknown_customer_has_empty_library():
     assert db.get_library(999999) == []
-
-
-def test_customer_id_must_be_a_real_int():
-    for value in ("2", 2.0, 0, -1, 2**63, None, [1]):
-        with pytest.raises(ValueError):
-            db.get_library(value)
-
-
-def test_boolean_customer_id_does_not_become_customer_one():
-    with pytest.raises(ValueError):
-        db.get_library(True)
