@@ -77,6 +77,38 @@ WHERE NOT EXISTS (
 ORDER BY t.TrackId
 """
 
+# One invoice header, only when it belongs to this customer.
+INVOICE_SQL = """
+SELECT
+    InvoiceId AS invoice_id,
+    date(InvoiceDate) AS invoice_date,
+    Total AS total
+FROM Invoice
+WHERE CustomerId = ? AND InvoiceId = ?
+"""
+
+# Line items on one invoice, priced at what the customer actually paid.
+INVOICE_LINES_SQL = """
+SELECT
+    il.InvoiceLineId AS invoice_line_id,
+    il.TrackId AS track_id,
+    t.Name AS track,
+    ar.Name AS artist,
+    m.Name AS media_type,
+    il.UnitPrice AS unit_price,
+    il.Quantity AS quantity
+FROM InvoiceLine il
+JOIN Track t ON t.TrackId = il.TrackId
+JOIN Album al ON al.AlbumId = t.AlbumId
+JOIN Artist ar ON ar.ArtistId = al.ArtistId
+JOIN MediaType m ON m.MediaTypeId = t.MediaTypeId
+WHERE il.InvoiceId = ?
+ORDER BY il.InvoiceLineId
+"""
+
+# A foreign invoice and a nonexistent one answer the same, so ids cannot be probed.
+INVOICE_NOT_FOUND = {"error": "Invoice not found on this account."}
+
 
 def connect() -> sqlite3.Connection:
     connection = sqlite3.connect(f"{DB_PATH.as_uri()}?mode=ro", uri=True)
@@ -95,6 +127,12 @@ def valid_id(value: int, field: str) -> int:
     return value
 
 
+def money_field(rows: list[dict], field: str = "unit_price") -> list[dict]:
+    for row in rows:
+        row[field] = money(row[field])
+    return rows
+
+
 def query(sql: str, params: tuple) -> list[dict]:
     connection = connect()
     try:
@@ -104,10 +142,7 @@ def query(sql: str, params: tuple) -> list[dict]:
 
 
 def get_library(customer_id: int) -> list[dict]:
-    rows = query(LIBRARY_SQL, (valid_id(customer_id, "customer_id"),))
-    for row in rows:
-        row["unit_price"] = money(row["unit_price"])
-    return rows
+    return money_field(query(LIBRARY_SQL, (valid_id(customer_id, "customer_id"),)))
 
 
 def partial_albums(customer_id: int) -> list[dict]:
@@ -115,10 +150,23 @@ def partial_albums(customer_id: int) -> list[dict]:
 
 
 def missing_tracks(customer_id: int, album_id: int) -> list[dict]:
-    rows = query(
-        MISSING_TRACKS_SQL,
-        (valid_id(customer_id, "customer_id"), valid_id(album_id, "album_id")),
+    return money_field(
+        query(
+            MISSING_TRACKS_SQL,
+            (valid_id(customer_id, "customer_id"), valid_id(album_id, "album_id")),
+        )
     )
-    for row in rows:
-        row["unit_price"] = money(row["unit_price"])
-    return rows
+
+
+def get_invoice(customer_id: int, invoice_id: int) -> dict:
+    header = query(
+        INVOICE_SQL,
+        (valid_id(customer_id, "customer_id"), valid_id(invoice_id, "invoice_id")),
+    )
+    if not header:
+        return dict(INVOICE_NOT_FOUND)
+
+    invoice = header[0]
+    invoice["total"] = money(invoice["total"])
+    invoice["lines"] = money_field(query(INVOICE_LINES_SQL, (invoice_id,)))
+    return invoice
