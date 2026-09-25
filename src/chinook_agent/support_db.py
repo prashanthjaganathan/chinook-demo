@@ -21,6 +21,11 @@ CREATE TABLE IF NOT EXISTS refund_requests (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS thread_owners (
+    thread_id TEXT PRIMARY KEY,
+    customer_id INTEGER NOT NULL
+);
+
 CREATE UNIQUE INDEX IF NOT EXISTS one_live_request_per_line
 ON refund_requests(invoice_line_id)
 WHERE status IN ('open', 'approved');
@@ -95,5 +100,25 @@ def open_requests(customer_id: int) -> list[dict]:
                 (db.valid_id(customer_id, "customer_id"),),
             )
         ]
+    finally:
+        connection.close()
+
+
+def bind_thread(thread_id: str, customer_id: int) -> int:
+    """Claims a thread for a customer, and reports who actually owns it.
+
+    thread_id is the primary key, so the first claim wins and any later caller
+    reading a different id back is not the owner.
+    """
+    connection = connect()
+    try:
+        connection.execute(
+            "INSERT OR IGNORE INTO thread_owners (thread_id, customer_id) VALUES (?, ?)",
+            (str(thread_id), db.valid_id(customer_id, "customer_id")),
+        )
+        connection.commit()
+        return connection.execute(
+            "SELECT customer_id FROM thread_owners WHERE thread_id = ?", (str(thread_id),)
+        ).fetchone()["customer_id"]
     finally:
         connection.close()

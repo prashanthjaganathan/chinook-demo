@@ -3,11 +3,17 @@ import os
 from langchain.chat_models import init_chat_model
 from langchain_core.language_models import BaseChatModel
 
+from chinook_agent import config
 from chinook_agent.config import MODEL_CHAIN, ModelSpec
 
 
+def base_options() -> dict:
+    # Retries live in middleware, so the provider SDK does not add its own.
+    return {"timeout": config.MODEL_TIMEOUT_SECONDS, "max_retries": 0}
+
+
 def build(spec: ModelSpec) -> BaseChatModel:
-    options = dict(spec.options or {})
+    options = {**base_options(), **(spec.options or {})}
     if spec.api_key_env:
         key = os.environ.get(spec.api_key_env)
         if not key:

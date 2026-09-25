@@ -51,3 +51,24 @@ MODEL_CHAIN = (
     ModelSpec("openai:gpt-5.6-luna", "OPENAI_API_KEY", {"use_responses_api": True}),
     ModelSpec("anthropic:claude-sonnet-4-6", "ANTHROPIC_API_KEY"),
 )
+
+
+# Cost ceiling: a confused agent stops here instead of billing indefinitely.
+# Per run is one user message; per thread is the whole conversation.
+MODEL_CALLS_PER_RUN = 8
+MODEL_CALLS_PER_THREAD = 40
+TOOL_CALLS_PER_RUN = 12
+TOOL_CALLS_PER_THREAD = 60
+
+
+# One model call is allowed this long; retries and the fallback chain multiply it.
+MODEL_TIMEOUT_SECONDS = 15
+MODEL_MAX_RETRIES = 1
+# No single turn may take longer than this, however the failures line up.
+TURN_BUDGET_SECONDS = 600
+
+
+def worst_case_seconds() -> int:
+    """Every model call timing out, on every model, on every attempt."""
+    per_call = (1 + MODEL_MAX_RETRIES) * len(MODEL_CHAIN)
+    return MODEL_CALLS_PER_RUN * per_call * MODEL_TIMEOUT_SECONDS

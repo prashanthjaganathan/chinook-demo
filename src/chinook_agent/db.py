@@ -193,6 +193,11 @@ ORDER BY i.InvoiceDate DESC, il.InvoiceLineId DESC
 LIMIT 1
 """
 
+# One row when this customer exists, nothing otherwise.
+CUSTOMER_EXISTS_SQL = """
+SELECT 1 AS present FROM Customer WHERE CustomerId = ?
+"""
+
 
 def connect() -> sqlite3.Connection:
     connection = sqlite3.connect(f"{DB_PATH.as_uri()}?mode=ro", uri=True)
@@ -352,3 +357,7 @@ def purchase_of(customer_id: int, track_id: int) -> dict | None:
         )
     )
     return rows[0] if rows else None
+
+
+def customer_exists(customer_id: int) -> bool:
+    return bool(query(CUSTOMER_EXISTS_SQL, (valid_id(customer_id, "customer_id"),)))
