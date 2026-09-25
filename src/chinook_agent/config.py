@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from decimal import Decimal
 
 
@@ -24,3 +25,17 @@ def plays_anywhere(media_type: str) -> bool:
 
 def media_kind(media_type: str) -> str:
     return "video" if media_type in VIDEO_FORMATS else "audio"
+
+
+@dataclass(frozen=True)
+class ModelSpec:
+    name: str
+    api_key_env: str | None = None
+
+
+# Tried in order when a model call fails. Add a provider by appending a spec;
+# use a second key from a provider already listed by naming its own api_key_env.
+MODEL_CHAIN = (
+    ModelSpec("openai:gpt-5.6-luna", "OPENAI_API_KEY"),
+    ModelSpec("anthropic:claude-sonnet-4-6", "ANTHROPIC_API_KEY"),
+)
