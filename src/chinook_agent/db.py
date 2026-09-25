@@ -166,6 +166,15 @@ WHERE i.CustomerId = :customer_id
   AND il.TrackId IN (:original_id, :replacement_id)
 """
 
+# The customer's most recent invoice id, or nothing when they have never bought.
+LATEST_INVOICE_SQL = """
+SELECT InvoiceId AS invoice_id
+FROM Invoice
+WHERE CustomerId = ?
+ORDER BY InvoiceDate DESC, InvoiceId DESC
+LIMIT 1
+"""
+
 
 def connect() -> sqlite3.Connection:
     connection = sqlite3.connect(f"{DB_PATH.as_uri()}?mode=ro", uri=True)
@@ -307,3 +316,8 @@ def check_swap(
     if ids["original_id"] not in owned:
         return "That purchase is not on this account."
     return swap_problem(original, replacement, ids["replacement_id"] in owned)
+
+
+def latest_invoice_id(customer_id: int) -> int | None:
+    rows = query(LATEST_INVOICE_SQL, (valid_id(customer_id, "customer_id"),))
+    return rows[0]["invoice_id"] if rows else None

@@ -20,6 +20,15 @@ PROTECTED_FORMATS = frozenset(
 )
 VIDEO_FORMATS = frozenset({"Protected MPEG-4 video file"})
 
+# Every format Chinook ships. A test keeps this in step with the database.
+MEDIA_TYPES = (
+    "MPEG audio file",
+    "AAC audio file",
+    "Purchased AAC audio file",
+    "Protected AAC audio file",
+    "Protected MPEG-4 video file",
+)
+
 
 def plays_anywhere(media_type: str) -> bool:
     return media_type not in PROTECTED_FORMATS

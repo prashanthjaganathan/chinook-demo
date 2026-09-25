@@ -2,18 +2,20 @@ from decimal import Decimal
 
 from langchain.tools import ToolRuntime, tool
 
-from chinook_agent import db
+from chinook_agent import db, pricing
 from chinook_agent.context import CustomerContext
 
+NO_PURCHASES = {"error": "There are no purchases on this account yet."}
 
-def readable(rows: list[dict]) -> list[dict]:
-    return [
-        {
-            key: str(value) if isinstance(value, Decimal) else value
-            for key, value in row.items()
-        }
-        for row in rows
-    ]
+
+def readable(value):
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, dict):
+        return {key: readable(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [readable(item) for item in value]
+    return value
 
 
 @tool
@@ -26,4 +28,83 @@ def get_my_library(runtime: ToolRuntime[CustomerContext]) -> list[dict]:
     return readable(db.get_library(runtime.context.customer_id))
 
 
-TOOLS = [get_my_library]
+@tool
+def get_invoice(
+    runtime: ToolRuntime[CustomerContext], invoice_id: int | None = None
+) -> dict:
+    """Read one of this customer's own past purchases, newest by default.
+
+    Returns the date, the total, and every line with the price actually paid and
+    the file format. Another customer's invoice reads as not found.
+    """
+    customer_id = runtime.context.customer_id
+    if invoice_id is None:
+        invoice_id = db.latest_invoice_id(customer_id)
+        if invoice_id is None:
+            return dict(NO_PURCHASES)
+    return readable(db.get_invoice(customer_id, invoice_id))
+
+
+@tool
+def search_catalog(
+    runtime: ToolRuntime[CustomerContext],
+    track: str | None = None,
+    album: str | None = None,
+    artist: str | None = None,
+    genre: str | None = None,
+    media_type: str | None = None,
+    exclude_owned: bool = False,
+    limit: int = 10,
+) -> list[dict]:
+    """Search the store catalog by track, album, artist, genre, or file format.
+
+    Set exclude_owned to hide what this customer already owns, for example when
+    looking for a replacement. Returns matching tracks with format and price.
+    """
+    return readable(
+        db.search_catalog(
+            track=track,
+            album=album,
+            artist=artist,
+            genre=genre,
+            media_type=media_type,
+            exclude_owned_for=runtime.context.customer_id if exclude_owned else None,
+            limit=limit,
+        )
+    )
+
+
+def offer(customer_id: int, album: dict, with_tracks: bool) -> dict:
+    missing = db.missing_tracks(customer_id, album["album_id"])
+    priced = {
+        **album,
+        **pricing.completion_price([track["unit_price"] for track in missing]),
+        "missing_count": len(missing),
+    }
+    if with_tracks:
+        priced["missing_tracks"] = missing
+    return priced
+
+
+@tool
+def price_completion(
+    runtime: ToolRuntime[CustomerContext],
+    album_id: int | None = None,
+    limit: int = 5,
+) -> list[dict]:
+    """Price finishing an album this customer has already started buying.
+
+    With no album_id, lists the albums closest to complete and what each costs.
+    With an album_id, also names the exact tracks they are missing. Every price
+    already includes the completion discount.
+    """
+    customer_id = runtime.context.customer_id
+    albums = db.partial_albums(customer_id)
+    if album_id is not None:
+        albums = [album for album in albums if album["album_id"] == album_id]
+    return readable(
+        [offer(customer_id, album, album_id is not None) for album in albums[:limit]]
+    )
+
+
+TOOLS = [get_my_library, get_invoice, search_catalog, price_completion]

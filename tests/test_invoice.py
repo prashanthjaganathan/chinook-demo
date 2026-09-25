@@ -81,3 +81,21 @@ def test_not_found_result_cannot_be_mutated_by_a_caller():
     db.get_invoice(1, 999999)["error"] = "changed"
 
     assert db.INVOICE_NOT_FOUND == {"error": "Invoice not found on this account."}
+
+
+def test_latest_invoice_id_is_the_newest_one(chinook_db):
+    connection = sqlite3.connect(chinook_db)
+    try:
+        expected = connection.execute(
+            "SELECT InvoiceId FROM Invoice WHERE CustomerId = ? "
+            "ORDER BY InvoiceDate DESC, InvoiceId DESC LIMIT 1",
+            (1,),
+        ).fetchone()[0]
+    finally:
+        connection.close()
+
+    assert db.latest_invoice_id(1) == expected
+
+
+def test_latest_invoice_id_is_none_for_a_customer_with_no_purchases():
+    assert db.latest_invoice_id(999999) is None

@@ -10,6 +10,7 @@ CUSTOMER_FUNCTIONS = [
     pytest.param(lambda customer_id: db.missing_tracks(customer_id, 1), id="missing_tracks"),
     pytest.param(lambda customer_id: db.get_invoice(customer_id, 1), id="get_invoice"),
     pytest.param(lambda customer_id: db.check_swap(customer_id, 1, 2), id="check_swap"),
+    pytest.param(db.latest_invoice_id, id="latest_invoice_id"),
 ]
 ALBUM_FUNCTIONS = [
     pytest.param(lambda album_id: db.missing_tracks(1, album_id), id="missing_tracks"),
