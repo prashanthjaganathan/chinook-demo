@@ -9,3 +9,18 @@ def valid_discount(value: Decimal) -> Decimal:
 
 # Chinook has no album price, so completion needs an explicit discount to be worth taking.
 COMPLETION_DISCOUNT = valid_discount(Decimal("0.20"))
+
+
+# Apple FairPlay DRM: these formats only play on Apple devices.
+PROTECTED_FORMATS = frozenset(
+    {"Protected AAC audio file", "Protected MPEG-4 video file"}
+)
+VIDEO_FORMATS = frozenset({"Protected MPEG-4 video file"})
+
+
+def plays_anywhere(media_type: str) -> bool:
+    return media_type not in PROTECTED_FORMATS
+
+
+def media_kind(media_type: str) -> str:
+    return "video" if media_type in VIDEO_FORMATS else "audio"

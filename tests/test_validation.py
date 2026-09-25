@@ -9,6 +9,7 @@ CUSTOMER_FUNCTIONS = [
     pytest.param(db.partial_albums, id="partial_albums"),
     pytest.param(lambda customer_id: db.missing_tracks(customer_id, 1), id="missing_tracks"),
     pytest.param(lambda customer_id: db.get_invoice(customer_id, 1), id="get_invoice"),
+    pytest.param(lambda customer_id: db.check_swap(customer_id, 1, 2), id="check_swap"),
 ]
 ALBUM_FUNCTIONS = [
     pytest.param(lambda album_id: db.missing_tracks(1, album_id), id="missing_tracks"),
@@ -43,3 +44,11 @@ def test_invoice_id_must_be_a_real_int(function):
     for value in BAD_IDS:
         with pytest.raises(ValueError):
             function(value)
+
+
+def test_swap_track_ids_must_be_real_ints():
+    for value in BAD_IDS:
+        with pytest.raises(ValueError):
+            db.check_swap(1, value, 2)
+        with pytest.raises(ValueError):
+            db.check_swap(1, 2, value)
