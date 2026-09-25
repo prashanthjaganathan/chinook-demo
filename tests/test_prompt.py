@@ -44,6 +44,7 @@ def test_prompt_states_the_rules_workflow_b_depends_on():
         "can only be refunded, never replaced",
         "exclude_owned",
         "cost the same as the original",
-        "never say that one has been made",
+        "never say a refund or replacement has been made",
+        "the request did not happen",
     ):
         assert rule in flat

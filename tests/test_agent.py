@@ -24,7 +24,7 @@ def test_agent_wires_every_tool_into_the_graph(fake_keys):
     nodes = agent.build_agent().get_graph().nodes
 
     assert "tools" in nodes
-    assert len(TOOLS) == 4
+    assert len(TOOLS) == 5
 
 
 @pytest.mark.live

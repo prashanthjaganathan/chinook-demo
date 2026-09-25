@@ -175,6 +175,24 @@ ORDER BY InvoiceDate DESC, InvoiceId DESC
 LIMIT 1
 """
 
+# This customer's most recent purchase of one track, with what they paid for it.
+PURCHASE_SQL = """
+SELECT
+    il.InvoiceLineId AS invoice_line_id,
+    il.InvoiceId AS invoice_id,
+    il.TrackId AS track_id,
+    t.Name AS track,
+    m.Name AS media_type,
+    il.UnitPrice AS unit_price
+FROM Invoice i
+JOIN InvoiceLine il ON il.InvoiceId = i.InvoiceId
+JOIN Track t ON t.TrackId = il.TrackId
+JOIN MediaType m ON m.MediaTypeId = t.MediaTypeId
+WHERE i.CustomerId = :customer_id AND il.TrackId = :track_id
+ORDER BY i.InvoiceDate DESC, il.InvoiceLineId DESC
+LIMIT 1
+"""
+
 
 def connect() -> sqlite3.Connection:
     connection = sqlite3.connect(f"{DB_PATH.as_uri()}?mode=ro", uri=True)
@@ -321,3 +339,16 @@ def check_swap(
 def latest_invoice_id(customer_id: int) -> int | None:
     rows = query(LATEST_INVOICE_SQL, (valid_id(customer_id, "customer_id"),))
     return rows[0]["invoice_id"] if rows else None
+
+
+def purchase_of(customer_id: int, track_id: int) -> dict | None:
+    rows = money_field(
+        query(
+            PURCHASE_SQL,
+            {
+                "customer_id": valid_id(customer_id, "customer_id"),
+                "track_id": valid_id(track_id, "track_id"),
+            },
+        )
+    )
+    return rows[0] if rows else None

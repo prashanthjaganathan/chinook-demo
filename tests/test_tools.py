@@ -71,12 +71,13 @@ def test_readable_reaches_prices_nested_inside_an_invoice():
     assert invoice == {"total": "8.91", "lines": [{"unit_price": "0.99"}]}
 
 
-def test_all_three_tools_are_registered():
+def test_every_tool_is_registered():
     assert [tool.name for tool in TOOLS] == [
         "get_my_library",
         "get_invoice",
         "search_catalog",
         "price_completion",
+        "request_refund_or_swap",
     ]
 
 
