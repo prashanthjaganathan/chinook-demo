@@ -32,4 +32,5 @@ def test_agent_answers_what_do_i_own():
         context=CustomerContext(customer_id=54),
     )
 
-    assert "38" in result["messages"][-1].content
+    # .text flattens the block list the Responses API returns.
+    assert "38" in result["messages"][-1].text

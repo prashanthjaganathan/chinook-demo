@@ -1,4 +1,6 @@
+from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Any
 from decimal import Decimal
 
 
@@ -31,11 +33,12 @@ def media_kind(media_type: str) -> str:
 class ModelSpec:
     name: str
     api_key_env: str | None = None
+    options: Mapping[str, Any] | None = None
 
 
 # Tried in order when a model call fails. Add a provider by appending a spec;
 # use a second key from a provider already listed by naming its own api_key_env.
 MODEL_CHAIN = (
-    ModelSpec("openai:gpt-5.6-luna", "OPENAI_API_KEY"),
+    ModelSpec("openai:gpt-5.6-luna", "OPENAI_API_KEY", {"use_responses_api": True}),
     ModelSpec("anthropic:claude-sonnet-4-6", "ANTHROPIC_API_KEY"),
 )

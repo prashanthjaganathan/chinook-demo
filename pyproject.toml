@@ -11,7 +11,10 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = [
+    "langgraph-cli[inmem]>=0.4.32",
+    "pytest>=8",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -24,3 +27,4 @@ packages = ["src/chinook_agent"]
 testpaths = ["tests"]
 pythonpath = ["src", "scripts"]
 markers = ["live: needs a real model API key"]
+addopts = "-m 'not live'"

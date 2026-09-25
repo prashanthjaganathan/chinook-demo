@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 from langchain.agents import create_agent
 from langchain.agents.middleware import ModelFallbackMiddleware
 
@@ -5,6 +6,9 @@ from chinook_agent import models
 from chinook_agent.context import CustomerContext
 from chinook_agent.prompt import SYSTEM_PROMPT
 from chinook_agent.tools import TOOLS
+
+
+load_dotenv()
 
 
 def build_agent():
@@ -16,3 +20,8 @@ def build_agent():
         middleware=[ModelFallbackMiddleware(*spares)] if spares else [],
         context_schema=CustomerContext,
     )
+
+
+def graph():
+    """Studio entrypoint. Built per call so importing this module needs no API keys."""
+    return build_agent()

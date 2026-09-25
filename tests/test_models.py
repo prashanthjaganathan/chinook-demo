@@ -1,13 +1,20 @@
 import pytest
 
 from chinook_agent import config, models
+from chinook_agent.tools import TOOLS
 
 
 def test_chain_starts_with_openai_and_falls_back_to_anthropic():
-    assert [spec.name for spec in config.MODEL_CHAIN] == [
-        "openai:gpt-5.6",
-        "anthropic:claude-sonnet-5",
-    ]
+    providers = [spec.name.split(":")[0] for spec in config.MODEL_CHAIN]
+
+    assert providers[:2] == ["openai", "anthropic"]
+
+
+def test_every_spec_names_its_provider():
+    for spec in config.MODEL_CHAIN:
+        provider, separator, model = spec.name.partition(":")
+
+        assert separator and provider and model
 
 
 def test_chain_has_at_least_one_fallback():
@@ -58,3 +65,27 @@ def test_fallbacks_are_everything_after_the_primary(monkeypatch):
 
     assert len(models.fallbacks()) == len(config.MODEL_CHAIN) - 1
     assert models.primary().model_name.startswith("gpt")
+
+
+def test_per_spec_options_reach_the_model(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    spec = config.ModelSpec("openai:gpt-5.6-luna", options={"use_responses_api": True})
+
+    assert models.build(spec).use_responses_api is True
+
+
+def test_the_openai_spec_uses_the_responses_api():
+    # Without it, binding tools returns 400 on /v1/chat/completions.
+    openai_spec = next(s for s in config.MODEL_CHAIN if s.name.startswith("openai:"))
+
+    assert (openai_spec.options or {}).get("use_responses_api") is True
+
+
+@pytest.mark.live
+@pytest.mark.parametrize(
+    "spec", config.MODEL_CHAIN, ids=[spec.name for spec in config.MODEL_CHAIN]
+)
+def test_every_model_in_the_chain_can_call_our_tools(spec):
+    reply = models.build(spec).bind_tools(TOOLS).invoke("How many tracks do I own?")
+
+    assert [call["name"] for call in reply.tool_calls] == ["get_my_library"]

@@ -9,3 +9,5 @@ __pycache__/
 *.egg-info/
 data/*.db
 data/*.sqlite
+.langgraph_api/
+docs/

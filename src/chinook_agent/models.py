@@ -7,7 +7,7 @@ from chinook_agent.config import MODEL_CHAIN, ModelSpec
 
 
 def build(spec: ModelSpec) -> BaseChatModel:
-    options = {}
+    options = dict(spec.options or {})
     if spec.api_key_env:
         key = os.environ.get(spec.api_key_env)
         if not key:
