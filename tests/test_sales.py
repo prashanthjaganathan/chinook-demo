@@ -60,18 +60,25 @@ def test_a_rejected_purchase_records_nothing():
     assert orders() == []
 
 
-def test_the_specialist_sees_the_customers_own_words():
+def test_the_specialist_sees_recent_turns_of_the_conversation():
     seen = []
 
     def records_task(messages):
         seen.append(next(m.text for m in messages if isinstance(m, HumanMessage)))
-        return AIMessage("ok")
+        return AIMessage("Which one?")
 
-    say(supervisor(records_task, task="recommend something"), "anything by Miles Davis?")
-    say(supervisor(records_task, task="anything by Miles Davis?"), "anything by Miles Davis?", thread="t2")
+    delegates_each_turn = FakeModel(respond=lambda m: call(
+        "ask_music_recommendation", {"task": "recommend"}, f"c{len(m)}")
+        if isinstance(m[-1], HumanMessage) else AIMessage(m[-1].text))
+    graph = supervisor(records_task, model=delegates_each_turn)
+    say(graph, "anything by Miles Davis?")
+    say(graph, "the second one")
 
-    assert seen == ["recommend something\n\nCustomer's words: anything by Miles Davis?",
-                    "anything by Miles Davis?"]
+    assert seen == [
+        "recommend\n\nRecent conversation:\nCustomer: anything by Miles Davis?",
+        "recommend\n\nRecent conversation:\nCustomer: anything by Miles Davis?\n"
+        "Assistant: Which one?\nCustomer: the second one",
+    ]
 
 
 def test_a_made_up_price_is_retried_inside_the_graph():

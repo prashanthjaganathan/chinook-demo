@@ -111,6 +111,11 @@ def test_a_multi_intent_message_calls_both_specialists():
         {"messages": [{"role": "user", "content":
             "Midnight will not play on my Android, and what album am I closest to finishing?"}]},
         config={"configurable": {"thread_id": "live-multi"}}, context=CustomerContext(customer_id=54))
+    # The refund pauses for the customer's confirmation before the second request is handled.
+    while "__interrupt__" in result:
+        result = graph.invoke(Command(resume={"decisions": [{"type": "approve"}]}),
+                              config={"configurable": {"thread_id": "live-multi"}},
+                              context=CustomerContext(customer_id=54))
     called = {c["name"] for m in result["messages"] for c in (getattr(m, "tool_calls", None) or [])}
 
     assert {"ask_invoice_support", "ask_music_recommendation"} <= called

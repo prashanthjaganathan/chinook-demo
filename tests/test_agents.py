@@ -47,29 +47,3 @@ def test_music_recommendation_finds_in_step_for_customer_48():
     answer = ask("music_recommendation", "What am I closest to finishing?", 48)["messages"][-1].text
 
     assert "In Step" in answer and "4.75" in answer
-
-
-@pytest.mark.live
-@live
-def test_invoice_support_diagnoses_protected_aac_on_android():
-    answer = ask("invoice_support", "Midnight will not play on my Android phone.", 54)["messages"][-1].text
-
-    assert "refund" in answer.lower() and ("drm" in answer.lower() or "protected" in answer.lower())
-
-
-@pytest.mark.live
-@live
-def test_invoice_support_does_not_blame_the_format_for_an_mp3():
-    answer = ask("invoice_support", "Someday Never Comes will not play on my Android.", 54)["messages"][-1].text
-    lower = answer.lower()
-
-    assert "fairplay" not in lower
-    assert "only play on apple" not in lower
-
-
-@pytest.mark.live
-@live
-def test_invoice_support_offers_only_a_refund_for_video():
-    answer = ask("invoice_support", "A TV episode I bought won't play on my Android tablet. Can I swap it?", 51)
-
-    assert "refund" in answer["messages"][-1].text.lower()

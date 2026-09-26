@@ -1,3 +1,4 @@
+import os
 from typing import get_args
 
 import pytest
@@ -149,3 +150,67 @@ def test_a_malformed_resume_breaks_the_thread_for_good(bad):
     with pytest.raises(Exception):
         resume(agent, config_, {"decisions": [{"type": "approve"}]})
     assert store.open_requests(54) == []
+
+
+live = pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="needs a real key")
+
+
+def say(graph, text, thread, customer_id=54):
+    payload = text if isinstance(text, Command) else {"messages": [{"role": "user", "content": text}]}
+    return graph.invoke(payload, config={"configurable": {"thread_id": thread}},
+                        context=CustomerContext(customer_id=customer_id))
+
+
+def approve(graph, thread, customer_id=54):
+    return say(graph, Command(resume={"decisions": [{"type": "approve"}]}), thread, customer_id)
+
+
+def confirmation(result):
+    return result["__interrupt__"][0].value["action_requests"][0]["description"]
+
+
+@pytest.mark.live
+@live
+def test_live_midnight_on_android_is_auto_approved():
+    graph = agents.build_supervisor(checkpointer=InMemorySaver())
+    paused = say(graph, "Midnight won't play on my Android phone. Can I get a refund?", "live-midnight")
+
+    assert confirmation(paused).startswith("Refund Midnight ($0.99")
+    approve(graph, "live-midnight")
+    assert [r["status"] for r in store.open_requests(54)] == ["auto_approved"]
+
+
+@pytest.mark.live
+@live
+def test_live_an_ambiguous_artist_lists_choices_then_confirms_one():
+    graph = agents.build_supervisor(checkpointer=InMemorySaver())
+    first = say(graph, "Please refund the Metallica song.", "live-metallica", customer_id=42)
+    assert "__interrupt__" not in first
+
+    paused = say(graph, "The first one. I bought it by mistake.", "live-metallica", customer_id=42)
+    metallica = {l["track"] for l in catalog.customer_purchases(42) if l["artist"] == "Metallica"}
+    assert confirmation(paused).removeprefix("Refund ").split(" ($")[0] in metallica
+
+
+@pytest.mark.live
+@live
+def test_live_a_vague_request_asks_which_and_why_in_one_turn():
+    graph = agents.build_supervisor(checkpointer=InMemorySaver())
+    result = say(graph, "I want a refund on this item.", "live-vague")
+    answer = result["messages"][-1].text.lower()
+
+    assert "__interrupt__" not in result
+    assert "reason" in answer or "why" in answer
+
+
+@pytest.mark.live
+@live
+def test_live_no_reason_is_asked_once_then_rejected_with_an_appeal_offer():
+    graph = agents.build_supervisor(checkpointer=InMemorySaver())
+    say(graph, "Please refund Midnight.", "live-no-reason")
+    paused = say(graph, "Just refund it.", "live-no-reason")
+
+    assert confirmation(paused).endswith("because no reason given?")
+    done = approve(graph, "live-no-reason")["messages"][-1].text.lower()
+    assert [r["status"] for r in store.open_requests(54)] == ["auto_rejected"]
+    assert "replacement" in done or "person" in done or "team" in done

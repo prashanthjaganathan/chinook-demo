@@ -124,6 +124,8 @@ SUPERVISOR_MODEL_CALLS_PER_THREAD = 40
 SUPERVISOR_TOOL_CALLS_PER_THREAD = 30
 SUBAGENT_MODEL_CALLS_PER_RUN = 6
 SUBAGENT_TOOL_CALLS_PER_RUN = 8
+# Specialists start fresh each time, so they get this many recent turns of the conversation.
+DELEGATE_TURNS = 6
 # The pathological ceiling: every call times out, on every model, on every attempt.
 TURN_BUDGET_SECONDS = 1800
 

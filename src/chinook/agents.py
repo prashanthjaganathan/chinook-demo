@@ -7,7 +7,7 @@ from langchain.agents.middleware import (
     ModelRetryMiddleware, ToolCallLimitMiddleware, ToolErrorMiddleware,
 )
 from langchain.tools import ToolRuntime, tool
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from chinook import config, models, observability, prompts, tools
 from chinook.context import CustomerContext
@@ -48,6 +48,7 @@ SUBAGENTS = (
         prompts.INVOICE_SUPPORT_PROMPT,
         (find_purchases, search_catalog, request_refund),
         approvals=("request_refund",),
+        extras=(MustUseATool, PriceGuard),
     ),
 )
 
@@ -109,13 +110,19 @@ def build_subagent(spec: AgentSpec, model=None, checkpointer=None):
     )
 
 
+def recent_turns(messages) -> str:
+    turns = [f"{'Customer' if isinstance(m, HumanMessage) else 'Assistant'}: {m.text}"
+             for m in messages
+             if isinstance(m, (HumanMessage, AIMessage)) and m.text and not getattr(m, "tool_calls", None)]
+    return "\n".join(turns[-config.DELEGATE_TURNS:])
+
+
 def delegate(spec: AgentSpec, subagent):
     @tool(f"ask_{spec.name}", description=spec.description)
     def ask(task: str, runtime: ToolRuntime[CustomerContext]) -> str:
-        # Forward the customer's own words so a paraphrased task can't lose a name.
-        said = next((m.text for m in reversed((runtime.state or {}).get("messages", []))
-                     if isinstance(m, HumanMessage)), "")
-        content = task if not said or said in task else f"{task}\n\nCustomer's words: {said}"
+        # The customer's own words, and what was already asked, survive a paraphrased task.
+        turns = recent_turns((runtime.state or {}).get("messages", []))
+        content = f"{task}\n\nRecent conversation:\n{turns}" if turns else task
         result = subagent.invoke(
             {"messages": [{"role": "user", "content": content}]},
             context=CustomerContext(customer_id=resolve_customer(runtime)),
