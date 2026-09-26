@@ -33,6 +33,11 @@ def media_kind(media_type: str) -> str:
     return "video" if media_type in VIDEO_FORMATS else "audio"
 
 
+RESOLVE_CUTOFF = 0.8
+RESOLVE_MARGIN = 0.05
+# Nicknames that string matching can't guess, keyed by normalized form.
+ALIASES = {"zep": "Led Zeppelin", "gnr": "Guns N' Roses", "rhcp": "Red Hot Chili Peppers"}
+
 MAX_SEARCH_TEXT = 100
 MAX_SEARCH_RESULTS = 50
 MAX_REASON = 500
