@@ -1,3 +1,4 @@
+import functools
 import sqlite3
 from decimal import Decimal
 from pathlib import Path
@@ -57,7 +58,8 @@ def clamped_limit(value) -> int:
 LIBRARY_SQL = """
 SELECT DISTINCT
     t.TrackId AS track_id, t.Name AS track, t.AlbumId AS album_id, al.Title AS album,
-    ar.Name AS artist, g.Name AS genre, m.Name AS media_type, t.UnitPrice AS unit_price
+    ar.Name AS artist, g.Name AS genre, m.Name AS media_type, t.UnitPrice AS unit_price,
+    al.ArtistId AS artist_id, t.GenreId AS genre_id
 FROM Invoice i
 JOIN InvoiceLine il ON il.InvoiceId = i.InvoiceId
 JOIN Track t ON t.TrackId = il.TrackId
@@ -184,6 +186,46 @@ WHERE i.CustomerId = :customer_id AND il.TrackId IN (:original_id, :replacement_
 # One row when this customer exists.
 CUSTOMER_EXISTS_SQL = "SELECT 1 AS present FROM Customer WHERE CustomerId = ?"
 
+# Names to match typed text against. Track labels name the artist so duplicates can be told apart.
+NAMES_SQL = {
+    "artist": "SELECT ArtistId AS id, Name AS name, Name AS label FROM Artist",
+    "genre": "SELECT GenreId AS id, Name AS name, Name AS label FROM Genre",
+    "track": """SELECT t.TrackId AS id, t.Name AS name, t.Name || ' by ' || ar.Name AS label
+                FROM Track t JOIN Album al ON al.AlbumId = t.AlbumId
+                JOIN Artist ar ON ar.ArtistId = al.ArtistId""",
+}
+
+# Unowned tracks for one artist or genre (or all), most-bought in the store first.
+RANKED_TRACKS_SQL = """
+SELECT t.TrackId AS track_id, t.Name AS track, t.AlbumId AS album_id, al.Title AS album,
+       ar.Name AS artist, g.Name AS genre, m.Name AS media_type, t.UnitPrice AS unit_price,
+       (SELECT COUNT(*) FROM InvoiceLine s WHERE s.TrackId = t.TrackId) AS sales
+FROM Track t
+JOIN Album al ON al.AlbumId = t.AlbumId
+JOIN Artist ar ON ar.ArtistId = al.ArtistId
+JOIN Genre g ON g.GenreId = t.GenreId
+JOIN MediaType m ON m.MediaTypeId = t.MediaTypeId
+WHERE (:artist_id IS NULL OR ar.ArtistId = :artist_id)
+  AND (:genre_id IS NULL OR g.GenreId = :genre_id)
+  AND NOT EXISTS (SELECT 1 FROM Invoice i JOIN InvoiceLine il ON il.InvoiceId = i.InvoiceId
+                  WHERE i.CustomerId = :customer_id AND il.TrackId = t.TrackId)
+ORDER BY sales DESC, t.TrackId
+LIMIT :limit
+"""
+
+# The artist and genre of one track.
+TRACK_INFO_SQL = """
+SELECT al.ArtistId AS artist_id, t.GenreId AS genre_id
+FROM Track t JOIN Album al ON al.AlbumId = t.AlbumId WHERE t.TrackId = ?
+"""
+
+# The store's best-selling genres, offered as choices to new customers.
+TOP_GENRES_SQL = """
+SELECT g.Name AS name FROM InvoiceLine il
+JOIN Track t ON t.TrackId = il.TrackId JOIN Genre g ON g.GenreId = t.GenreId
+GROUP BY g.GenreId ORDER BY COUNT(*) DESC, g.GenreId LIMIT 5
+"""
+
 # Every customer's phone, for matching on digits.
 PHONES_SQL = "SELECT CustomerId AS customer_id, Phone AS phone FROM Customer WHERE Phone IS NOT NULL"
 
@@ -225,6 +267,26 @@ def purchase_of(customer_id: int, track_id: int) -> dict | None:
     }
     rows = with_money(query(PURCHASE_SQL, params))
     return rows[0] if rows else None
+
+
+@functools.lru_cache
+def names(kind: str) -> tuple:
+    return tuple(query(NAMES_SQL[kind], ()))
+
+
+def ranked_tracks(customer_id: int, artist_id=None, genre_id=None) -> list[dict]:
+    params = {"customer_id": valid_id(customer_id, "customer_id"), "artist_id": artist_id,
+              "genre_id": genre_id, "limit": config.MAX_SEARCH_RESULTS}
+    return with_money(query(RANKED_TRACKS_SQL, params))
+
+
+def track_info(track_id: int) -> dict | None:
+    rows = query(TRACK_INFO_SQL, (valid_id(track_id, "track_id"),))
+    return rows[0] if rows else None
+
+
+def top_genres() -> list[str]:
+    return [row["name"] for row in query(TOP_GENRES_SQL, ())]
 
 
 def search_catalog(

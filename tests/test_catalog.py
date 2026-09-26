@@ -181,3 +181,24 @@ def test_aaron_mitchell_is_found_by_phone(phone):
 @pytest.mark.parametrize("phone", ["+1 (999) 000-0000", "' OR 1=1 --", "", None, "123"])
 def test_unknown_or_malformed_phone_finds_nobody(phone):
     assert catalog.customer_by_phone(phone) is None
+
+
+def test_ranked_tracks_exclude_owned():
+    owned = {t["track_id"] for t in catalog.get_library(1)}
+    ranked = catalog.ranked_tracks(1)
+
+    assert ranked and not owned & {t["track_id"] for t in ranked}
+
+
+def test_ranked_tracks_order_is_sales_then_id():
+    ranked = catalog.ranked_tracks(1, artist_id=90)
+
+    assert ranked == sorted(ranked, key=lambda t: (-t["sales"], t["track_id"]))
+    assert {t["artist"] for t in ranked} == {"Iron Maiden"}
+
+
+def test_track_info_and_names():
+    assert catalog.track_info(1) == {"artist_id": 1, "genre_id": 1}
+    assert catalog.track_info(999999) is None
+    assert {"id": 1, "name": "AC/DC", "label": "AC/DC"} in catalog.names("artist")
+    assert len(catalog.top_genres()) == 5
