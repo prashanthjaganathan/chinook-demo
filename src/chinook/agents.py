@@ -7,12 +7,15 @@ from langchain.agents.middleware import (
     ModelRetryMiddleware, ToolCallLimitMiddleware, ToolErrorMiddleware,
 )
 from langchain.tools import ToolRuntime, tool
+from langchain_core.messages import HumanMessage
 
-from chinook import config, models, observability, prompts
+from chinook import config, models, observability, prompts, tools
 from chinook.context import CustomerContext
-from chinook.middleware import AuthMiddleware, SessionGuard, atool_error, model_failure, tool_error
+from chinook.middleware import (
+    AuthMiddleware, MustUseATool, PriceGuard, SessionGuard, atool_error, model_failure, tool_error,
+)
 from chinook.tools import (
-    get_invoice, get_my_library, recommend_engine, request_refund_or_swap, resolve_customer,
+    buy_completion, get_invoice, get_my_library, recommend_engine, request_refund_or_swap, resolve_customer,
     search_catalog,
 )
 
@@ -27,14 +30,17 @@ class AgentSpec:
     prompt: str
     tools: tuple
     approvals: tuple = ()
+    extras: tuple = ()  # middleware classes for this specialist only
 
 
 SUBAGENTS = (
     AgentSpec(
         "music_recommendation",
-        "Finds albums the customer has partly bought and prices the missing tracks.",
+        "Recommends music, finds albums to finish, remembers taste, and sells album completions.",
         prompts.MUSIC_RECOMMENDATION_PROMPT,
-        (recommend_engine,),
+        (recommend_engine, buy_completion),
+        approvals=("buy_completion",),
+        extras=(MustUseATool, PriceGuard),
     ),
     AgentSpec(
         "invoice_support",
@@ -54,8 +60,9 @@ def approval(spec: AgentSpec) -> list:
     if not spec.approvals:
         return []
     return [HumanInTheLoopMiddleware(
-        interrupt_on={name: {"allowed_decisions": ["approve", "reject"]} for name in spec.approvals},
-        description_prefix="Review this before it is recorded",
+        interrupt_on={name: {"allowed_decisions": ["approve", "reject"],
+                             "description": tools.APPROVAL_TEXT.get(name, "Review this before it is recorded")}
+                      for name in spec.approvals},
     )]
 
 
@@ -77,6 +84,7 @@ def subagent_middleware(spec: AgentSpec, spares=()) -> list:
         SessionGuard(),
         ToolErrorMiddleware(tool_error, aon_error=atool_error),
         *limits(config.SUBAGENT_MODEL_CALLS_PER_RUN, config.SUBAGENT_TOOL_CALLS_PER_RUN),
+        *[extra() for extra in spec.extras],
         *resilience(spares),
         *approval(spec),
     ]
@@ -104,8 +112,12 @@ def build_subagent(spec: AgentSpec, model=None, checkpointer=None):
 def delegate(spec: AgentSpec, subagent):
     @tool(f"ask_{spec.name}", description=spec.description)
     def ask(task: str, runtime: ToolRuntime[CustomerContext]) -> str:
+        # Forward the customer's own words so a paraphrased task can't lose a name.
+        said = next((m.text for m in reversed((runtime.state or {}).get("messages", []))
+                     if isinstance(m, HumanMessage)), "")
+        content = task if not said or said in task else f"{task}\n\nCustomer's words: {said}"
         result = subagent.invoke(
-            {"messages": [{"role": "user", "content": task}]},
+            {"messages": [{"role": "user", "content": content}]},
             context=CustomerContext(customer_id=resolve_customer(runtime)),
         )
         return result["messages"][-1].text

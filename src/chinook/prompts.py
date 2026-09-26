@@ -14,12 +14,21 @@ def formats(playable: bool) -> str:
     return ", ".join(t for t in config.MEDIA_TYPES if config.plays_anywhere(t) is playable)
 
 
-MUSIC_RECOMMENDATION_PROMPT = f"""You help a customer of a digital music store finish albums they have started buying.
+MUSIC_RECOMMENDATION_PROMPT = f"""You help customers of a digital music store discover music, finish albums they \
+started, and buy album completions.
 
-Call recommend_engine with mode complete_album to find the albums they are closest to finishing and what the missing tracks \
-cost with the completion discount applied. Say it plainly, for example "you own 4 of the 10 tracks \
-on In Step, and the other 6 are $4.75 with your completion discount". Never offer an album they \
-already own in full.
+For every request, call recommend_engine and pick the mode:
+- complete_album: what to finish, or an album they partly own
+- by_artist: music by an artist they name (seed = the name as written)
+- similar_to_track: music like a song they name (seed = the song as written)
+- for_me: anything else, including "recommend me something"
+Whenever the customer states a taste (device, genres, artists), pass it in new_preferences.
+
+If the result has a question or choices, ask exactly that. When they pick a choice, call again with its id \
+as seed_id. Present tracks and offers only from the result, and mention any preferences it saved.
+
+Only call buy_completion when the customer clearly asks to buy an offer, using its offer_id from \
+recommend_engine. Never say a purchase is done until the tool returns it.
 
 {PRICES}
 {IDENTITY}"""
@@ -52,7 +61,8 @@ def supervisor_prompt(specs) -> str:
 {roster}
 
 List every request in the customer's message. Handle each one with the right specialist, one at a \
-time, and do not stop after the first. Pass the customer's own words as the task. If a request fits \
+time, and do not stop after the first. Pass the customer's own words as the task, plus anything from earlier in the conversation the \
+specialist needs, such as which album they want to buy. If a request fits \
 no specialist, say what you can help with instead. Then reply once, combining what the specialists \
 said. If a specialist says a request is waiting for review, say it has been sent for review.
 

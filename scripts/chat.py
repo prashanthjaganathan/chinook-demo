@@ -32,7 +32,7 @@ def main() -> None:
                               config=config, context=context)
         while "__interrupt__" in result:
             request = result["__interrupt__"][0].value["action_requests"][0]
-            print(f"\n  REVIEW {request['name']}: {request['args']}")
+            print(f"\n  REVIEW {request['name']}: {request.get('description', '')}\n  {request['args']}")
             decision = "approve" if input("  approve? [y/N] ").strip().lower() == "y" else "reject"
             result = graph.invoke(Command(resume={"decisions": [{"type": decision}]}),
                                   config=config, context=context)
