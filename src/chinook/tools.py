@@ -173,6 +173,7 @@ def request_refund_or_swap(
             replacement_track_id=replacement_track_id,
             amount=str(purchase["unit_price"]),
             reason=reason.strip(),
+            status="needs_review", score=None, policy=config.REFUND_POLICY_VERSION,
         )
     except Exception:
         return {"error": config.REQUEST_NOT_DONE}

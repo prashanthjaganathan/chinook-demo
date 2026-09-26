@@ -13,3 +13,4 @@ data/*.sqlite
 docs/
 merge_code.py
 merged_code.txt
+.vscode/

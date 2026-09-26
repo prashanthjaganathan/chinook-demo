@@ -4,7 +4,7 @@ import os
 import sqlite3
 from pathlib import Path
 
-from chinook import catalog
+from chinook import catalog, config
 
 DEFAULT_PATH = Path(__file__).resolve().parents[2] / "data" / "support.sqlite"
 
@@ -18,11 +18,13 @@ CREATE TABLE IF NOT EXISTS refund_requests (
     replacement_track_id INTEGER,
     amount TEXT NOT NULL,
     reason TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'open',
+    status TEXT NOT NULL,
+    score INTEGER,
+    policy TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS one_live_request_per_line
-    ON refund_requests(invoice_line_id) WHERE status IN ('open', 'approved');
+    ON refund_requests(invoice_line_id) WHERE status IN ('needs_review', 'auto_approved', 'approved');
 CREATE TABLE IF NOT EXISTS thread_owners (
     thread_id TEXT PRIMARY KEY,
     customer_id INTEGER NOT NULL
@@ -87,9 +89,11 @@ def record(key: str, **fields) -> dict:
         connection.execute(
             """
             INSERT INTO refund_requests (request_key, customer_id, invoice_line_id, track_id,
-                                         action, replacement_track_id, amount, reason)
+                                         action, replacement_track_id, amount, reason,
+                                         status, score, policy)
             VALUES (:request_key, :customer_id, :invoice_line_id, :track_id,
-                    :action, :replacement_track_id, :amount, :reason)
+                    :action, :replacement_track_id, :amount, :reason,
+                    :status, :score, :policy)
             """,
             {"request_key": key, **fields},
         )
@@ -103,6 +107,37 @@ def record(key: str, **fields) -> dict:
 def open_requests(customer_id: int) -> list[dict]:
     return execute("SELECT * FROM refund_requests WHERE customer_id = ? ORDER BY created_at",
                    (catalog.valid_id(customer_id, "customer_id"),))
+
+
+def has_live_request(invoice_line_id: int) -> bool:
+    return bool(execute("""SELECT 1 FROM refund_requests WHERE invoice_line_id = ?
+                           AND status IN ('needs_review', 'auto_approved', 'approved')""",
+                        (invoice_line_id,)))
+
+
+def recent_refunds(customer_id: int) -> int:
+    rows = execute("""SELECT COUNT(*) AS n FROM refund_requests
+                      WHERE customer_id = ? AND action = 'refund' AND status IN ('auto_approved', 'approved')
+                        AND created_at >= datetime('now', ?)""",
+                   (catalog.valid_id(customer_id, "customer_id"), f"-{config.RECENT_REFUND_DAYS} days"))
+    return rows[0]["n"]
+
+
+def waiting_for_review() -> list[dict]:
+    return execute("SELECT * FROM refund_requests WHERE status = 'needs_review' ORDER BY created_at")
+
+
+def review(key: str, approved: bool) -> bool:
+    """Staff decide only what is waiting for them. Returns whether anything changed."""
+    connection = connect()
+    try:
+        changed = connection.execute(
+            "UPDATE refund_requests SET status = ? WHERE request_key = ? AND status = 'needs_review'",
+            ("approved" if approved else "rejected", key)).rowcount
+        connection.commit()
+        return bool(changed)
+    finally:
+        connection.close()
 
 
 def bind_thread(thread_id: str, customer_id: int) -> int:

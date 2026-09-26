@@ -40,7 +40,7 @@ def test_a_valid_swap_is_recorded_and_an_invalid_one_is_not():
     protected = catalog.search_catalog(media_type="Protected AAC", exclude_owned_for=54, limit=1)[0]
 
     assert "error" in ask(action="swap", replacement_track_id=protected["track_id"])
-    assert ask(action="swap", replacement_track_id=MP3)["status"] == "open"
+    assert ask(action="swap", replacement_track_id=MP3)["status"] == "needs_review"
 
 
 def test_two_parallel_refunds_for_one_line_write_once():

@@ -8,7 +8,8 @@ from chinook import catalog, store
 
 def a_request(**overrides):
     return {"customer_id": 54, "invoice_line_id": 1111, "track_id": 1504, "action": "refund",
-            "replacement_track_id": None, "amount": "0.99", "reason": "will not play", **overrides}
+            "replacement_track_id": None, "amount": "0.99", "reason": "wont_play",
+            "status": "needs_review", "score": 65, "policy": "v1", **overrides}
 
 
 def test_a_replayed_request_is_recorded_once():
@@ -75,3 +76,36 @@ def test_a_replayed_order_is_recorded_once():
 
     assert first == again and again["amount"] == "4.75"
     assert len(store.execute("SELECT * FROM orders")) == 1
+
+
+def test_only_live_requests_block_a_line():
+    store.record("k1", **a_request(status="auto_rejected", score=35))
+    assert not store.has_live_request(1111)
+
+    store.record("k2", **a_request())
+    assert store.has_live_request(1111)
+    with pytest.raises(sqlite3.IntegrityError):
+        store.record("k3", **a_request(status="auto_approved"))
+
+
+def test_recent_refunds_counts_approved_refunds_in_the_window():
+    store.record("k1", **a_request(invoice_line_id=1, status="auto_approved"))
+    store.record("k2", **a_request(invoice_line_id=2, status="approved"))
+    store.record("k3", **a_request(invoice_line_id=3, status="needs_review"))
+    store.record("k4", **a_request(invoice_line_id=4, action="swap", status="auto_approved"))
+    store.record("k5", **a_request(invoice_line_id=5, status="auto_approved"))
+    store.execute("UPDATE refund_requests SET created_at = datetime('now', '-91 days') WHERE request_key = 'k5'")
+
+    assert store.recent_refunds(54) == 2
+    assert store.recent_refunds(4) == 0
+
+
+def test_review_only_changes_what_is_waiting():
+    store.record("waiting", **a_request(invoice_line_id=1))
+    store.record("done", **a_request(invoice_line_id=2, status="auto_approved"))
+
+    assert [r["request_key"] for r in store.waiting_for_review()] == ["waiting"]
+    assert store.review("waiting", approved=True) and not store.review("waiting", approved=False)
+    assert not store.review("done", approved=False)
+    assert {r["request_key"]: r["status"] for r in store.open_requests(54)} == {
+        "waiting": "approved", "done": "auto_approved"}

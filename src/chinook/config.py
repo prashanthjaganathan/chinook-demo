@@ -74,6 +74,36 @@ MODEL_MAX_RETRIES = 1
 NOT_YOUR_PURCHASE = "That track is not on this account."
 REQUEST_NOT_DONE = "The request was not completed, so nothing was changed."
 REFUND_ACTIONS = ("refund", "swap")
+ALREADY_REQUESTED = "That purchase already has a refund or replacement in progress."
+
+# Refund policy, compiled from the store's policy doc and reviewed. Bump the version on any change.
+REFUND_POLICY_VERSION = "v1"
+REFUND_REASON_LABELS = {
+    "wont_play": "it won't play on my device",
+    "bought_by_mistake": "I bought it by mistake",
+    "didnt_like_it": "I didn't like it",
+    "other": "something else",
+    "not_given": "no reason given",
+}
+REFUNDABLE_REASONS = ("wont_play", "bought_by_mistake")
+# Each item is a yes/no computed in code; the score is the sum of the weights that pass.
+REFUND_CHECKLIST = {
+    "reason_is_refundable": 30,
+    "data_supports_reason": 35,
+    "first_refund_recently": 20,
+    "within_auto_limit": 15,
+}
+REFUND_BANDS = (40, 70)  # under 40: auto reject; 40 to 69: staff review; 70 and up: auto approve
+AUTO_REFUND_LIMIT = Decimal("1.99")
+RECENT_REFUND_DAYS = 90
+MAX_RECENT_REFUNDS = 3  # at or above this, always staff review
+MAX_CANDIDATES = 5
+REFUND_MESSAGES = {
+    "auto_approved": "Your refund is approved.",
+    "needs_review": "I've sent this to our team to review. You'll hear back soon.",
+    "auto_rejected": "This doesn't qualify for a refund under our policy. "
+                     "I can offer a replacement, or ask a person to take another look.",
+}
 
 AUTH_MAX_ATTEMPTS = 3
 OTP_LENGTH_RANGE = (4, 8)
