@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from chinook.app import agents, prompts
+from chinook.agent import prompts, team
 from chinook.foundation.context import CustomerContext
 from chinook.helpers import store
 
@@ -21,14 +21,14 @@ def first_track_answer(messages):
     return AIMessage(json.loads(results[0].content)["purchases"][0]["label"])
 
 
-def supervisor(sup_model, sub_model, checkpointer=None, specs=agents.SUBAGENTS):
-    return agents.build_supervisor(checkpointer=checkpointer, model=sup_model,
+def supervisor(sup_model, sub_model, checkpointer=None, specs=team.SUBAGENTS):
+    return team.build_supervisor(checkpointer=checkpointer, model=sup_model,
                                    subagent_model=sub_model, specs=specs)
 
 
 def test_the_delegation_tool_takes_only_a_task():
-    spec = agents.spec_named("music_recommendation")
-    ask = agents.delegate(spec, agents.build_subagent(spec, model=once_then(AIMessage("hi"))))
+    spec = team.spec_named("music_recommendation")
+    ask = team.delegate(spec, team.build_subagent(spec, model=once_then(AIMessage("hi"))))
 
     assert ask.name == "ask_music_recommendation"
     assert list(ask.tool_call_schema.model_fields) == ["task"]
@@ -48,12 +48,12 @@ def test_the_supervisor_has_one_tool_per_specialist():
     graph = supervisor(once_then(AIMessage("hi")), once_then(AIMessage("hi")))
     tools = {name for name in graph.get_graph().nodes["tools"].data.tools_by_name}
 
-    assert tools == {f"ask_{spec.name}" for spec in agents.SUBAGENTS}
+    assert tools == {f"ask_{spec.name}" for spec in team.SUBAGENTS}
 
 
 def test_adding_a_spec_adds_a_tool_and_a_roster_line():
-    extra = agents.AgentSpec("gift_cards", "Handles gift cards.", "You handle gift cards.", ())
-    specs = agents.SUBAGENTS + (extra,)
+    extra = team.AgentSpec("gift_cards", "Handles gift cards.", "You handle gift cards.", ())
+    specs = team.SUBAGENTS + (extra,)
     graph = supervisor(once_then(AIMessage("hi")), once_then(AIMessage("hi")), specs=specs)
 
     assert "ask_gift_cards" in graph.get_graph().nodes["tools"].data.tools_by_name
@@ -101,13 +101,13 @@ def test_reject_through_the_supervisor_writes_nothing():
 def test_graph_entrypoint_has_no_checkpointer(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
-    assert agents.graph().checkpointer is None
+    assert team.graph().checkpointer is None
 
 
 @pytest.mark.live
 @pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="needs a real key")
 def test_a_multi_intent_message_calls_both_specialists():
-    graph = agents.build_supervisor(checkpointer=InMemorySaver())
+    graph = team.build_supervisor(checkpointer=InMemorySaver())
     result = graph.invoke(
         {"messages": [{"role": "user", "content":
             "Midnight will not play on my Android, and what album am I closest to finishing?"}]},

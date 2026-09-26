@@ -3,7 +3,7 @@ import os
 import pytest
 from helpers import call, once_then, tool_results
 
-from chinook.app import agents, prompts
+from chinook.agent import prompts, team
 from chinook.foundation import config
 from chinook.foundation.context import CustomerContext
 
@@ -11,17 +11,17 @@ live = pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="needs a real 
 
 
 def ask(spec_name, text, customer_id, model=None):
-    agent = agents.build_subagent(agents.spec_named(spec_name), model=model)
+    agent = team.build_subagent(team.spec_named(spec_name), model=model)
     return agent.invoke({"messages": [{"role": "user", "content": text}]},
                         context=CustomerContext(customer_id=customer_id))
 
 
 def test_the_registry_names_both_specialists():
-    assert [s.name for s in agents.SUBAGENTS] == ["music_recommendation", "invoice_support"]
+    assert [s.name for s in team.SUBAGENTS] == ["music_recommendation", "invoice_support"]
 
 
 def test_music_recommendation_uses_the_engine_but_not_invoices():
-    names = {t.name for t in agents.spec_named("music_recommendation").tools}
+    names = {t.name for t in team.spec_named("music_recommendation").tools}
 
     assert "recommend_engine" in names and "request_refund" not in names
 

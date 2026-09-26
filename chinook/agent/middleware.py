@@ -10,7 +10,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.config import get_config
 from pydantic import BaseModel
 
-from chinook.app import models
+from chinook.agent import models
 from chinook.domain import auth
 from chinook.foundation import config
 from chinook.helpers import catalog, otp, store

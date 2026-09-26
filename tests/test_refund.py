@@ -6,8 +6,8 @@ from helpers import once_then, ref, refund_call, runtime_for
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from chinook.app import agents
-from chinook.app.tools import RefundReason, describe_refund, request_refund
+from chinook.agent import team
+from chinook.agent.tools import RefundReason, describe_refund, request_refund
 from chinook.domain import refunds
 from chinook.foundation import config
 from chinook.foundation.context import CustomerContext
@@ -100,7 +100,7 @@ def test_the_confirmation_names_the_item_price_and_reason():
 
 
 def approval_agent():
-    return agents.build_subagent(agents.spec_named("invoice_support"), model=once_then(refund_call()),
+    return team.build_subagent(team.spec_named("invoice_support"), model=once_then(refund_call()),
                                  checkpointer=InMemorySaver())
 
 
@@ -134,12 +134,12 @@ def test_approve_writes_one_request_and_reject_writes_none():
 
 
 def test_approval_allows_only_approve_and_reject():
-    hitl = agents.approval(agents.spec_named("invoice_support"))[0]
+    hitl = team.approval(team.spec_named("invoice_support"))[0]
     allowed = hitl.interrupt_on["request_refund"]
 
     assert set(allowed["allowed_decisions"] if isinstance(allowed, dict) else allowed.allowed_decisions) == {
         "approve", "reject"}
-    assert agents.approval(agents.spec_named("music_recommendation"))[0].interrupt_on["buy_completion"]
+    assert team.approval(team.spec_named("music_recommendation"))[0].interrupt_on["buy_completion"]
 
 
 @pytest.mark.parametrize("bad", ["", {"decisions": "approve"}])
@@ -175,7 +175,7 @@ def confirmation(result):
 @pytest.mark.live
 @live
 def test_live_midnight_on_android_is_auto_approved():
-    graph = agents.build_supervisor(checkpointer=InMemorySaver())
+    graph = team.build_supervisor(checkpointer=InMemorySaver())
     paused = say(graph, "Midnight won't play on my Android phone. Can I get a refund?", "live-midnight")
 
     assert confirmation(paused).startswith("Refund Midnight ($0.99")
@@ -186,7 +186,7 @@ def test_live_midnight_on_android_is_auto_approved():
 @pytest.mark.live
 @live
 def test_live_an_ambiguous_artist_lists_choices_then_confirms_one():
-    graph = agents.build_supervisor(checkpointer=InMemorySaver())
+    graph = team.build_supervisor(checkpointer=InMemorySaver())
     first = say(graph, "Please refund the Metallica song.", "live-metallica", customer_id=42)
     assert "__interrupt__" not in first
 
@@ -198,7 +198,7 @@ def test_live_an_ambiguous_artist_lists_choices_then_confirms_one():
 @pytest.mark.live
 @live
 def test_live_a_vague_request_asks_which_and_why_in_one_turn():
-    graph = agents.build_supervisor(checkpointer=InMemorySaver())
+    graph = team.build_supervisor(checkpointer=InMemorySaver())
     result = say(graph, "I want a refund on this item.", "live-vague")
     answer = result["messages"][-1].text.lower()
 
@@ -209,7 +209,7 @@ def test_live_a_vague_request_asks_which_and_why_in_one_turn():
 @pytest.mark.live
 @live
 def test_live_no_reason_is_asked_once_then_rejected_with_an_appeal_offer():
-    graph = agents.build_supervisor(checkpointer=InMemorySaver())
+    graph = team.build_supervisor(checkpointer=InMemorySaver())
     say(graph, "Please refund Midnight.", "live-no-reason")
     paused = say(graph, "Just refund it.", "live-no-reason")
 

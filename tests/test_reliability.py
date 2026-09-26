@@ -10,14 +10,14 @@ from langchain_core.messages import AIMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from chinook.app import agents, models
-from chinook.app.middleware import (
+from chinook.agent import models, team
+from chinook.agent.middleware import (
     SessionGuard,
     atool_error,
     model_failure,
     tool_error,
 )
-from chinook.app.tools import find_purchases
+from chinook.agent.tools import find_purchases
 from chinook.foundation import config
 from chinook.foundation.context import CustomerContext
 from chinook.helpers import store
@@ -50,7 +50,7 @@ def test_the_async_session_guard_refuses_too():
 
 
 def test_a_resumed_write_is_rechecked_against_the_current_identity():
-    agent = agents.build_subagent(agents.spec_named("invoice_support"), model=once_then(refund_call()),
+    agent = team.build_subagent(team.spec_named("invoice_support"), model=once_then(refund_call()),
                                   checkpointer=InMemorySaver())
     cfg = {"configurable": {"thread_id": "t1"}}
     agent.invoke({"messages": [{"role": "user", "content": "refund"}]}, config=cfg,
@@ -78,7 +78,7 @@ def test_error_messages_leak_no_internals():
 def test_a_failing_tool_reaches_the_model_marked_as_an_error(monkeypatch):
     monkeypatch.setattr("chinook.helpers.catalog.customer_purchases",
                         lambda *a: (_ for _ in ()).throw(sqlite3.OperationalError("locked")))
-    result = agents.build_subagent(agents.spec_named("invoice_support"),
+    result = team.build_subagent(team.spec_named("invoice_support"),
                                    model=once_then(call("find_purchases"))).invoke(
         {"messages": [{"role": "user", "content": "go"}]}, context=CustomerContext(customer_id=54))
     message = tool_results(result["messages"])[0]
@@ -88,8 +88,8 @@ def test_a_failing_tool_reaches_the_model_marked_as_an_error(monkeypatch):
 
 def test_middleware_order_is_guard_then_errors_and_retry_then_fallback():
     spares = [once_then(AIMessage("spare"))]
-    sub = names(agents.subagent_middleware(agents.spec_named("invoice_support"), spares))
-    sup = names(agents.supervisor_middleware(spares=spares))
+    sub = names(team.subagent_middleware(team.spec_named("invoice_support"), spares))
+    sup = names(team.supervisor_middleware(spares=spares))
 
     assert sub.index("SessionGuard") < sub.index("ToolErrorMiddleware")
     for stack in (sub, sup):
@@ -99,7 +99,7 @@ def test_middleware_order_is_guard_then_errors_and_retry_then_fallback():
 
 def test_a_runaway_subagent_stops_with_a_message():
     looping = FakeModel(respond=lambda m: call("find_purchases", call_id=f"c{len(m)}"))
-    result = agents.build_subagent(agents.spec_named("invoice_support"), model=looping).invoke(
+    result = team.build_subagent(team.spec_named("invoice_support"), model=looping).invoke(
         {"messages": [{"role": "user", "content": "go"}]}, context=CustomerContext(customer_id=54))
 
     assert len(tool_results(result["messages"])) <= config.SUBAGENT_TOOL_CALLS_PER_RUN
@@ -108,7 +108,7 @@ def test_a_runaway_subagent_stops_with_a_message():
 
 def test_a_runaway_supervisor_stops_with_a_message():
     looping = FakeModel(respond=lambda m: call("ask_music_recommendation", {"task": "go"}, f"c{len(m)}"))
-    result = agents.build_supervisor(model=looping, subagent_model=once_then(AIMessage("ok"))).invoke(
+    result = team.build_supervisor(model=looping, subagent_model=once_then(AIMessage("ok"))).invoke(
         {"messages": [{"role": "user", "content": "go"}]}, context=CustomerContext(customer_id=54))
 
     assert "limit" in result["messages"][-1].text.lower()
@@ -118,7 +118,7 @@ def test_parallel_calls_past_the_limit_do_not_crash():
     both = FakeModel(respond=lambda m: AIMessage("", tool_calls=[
         {"name": "find_purchases", "args": {}, "id": f"a{len(m)}"},
         {"name": "search_catalog", "args": {}, "id": f"b{len(m)}"}]))
-    result = agents.build_subagent(agents.spec_named("invoice_support"), model=both).invoke(
+    result = team.build_subagent(team.spec_named("invoice_support"), model=both).invoke(
         {"messages": [{"role": "user", "content": "go"}]}, context=CustomerContext(customer_id=54))
 
     assert result["messages"][-1].text

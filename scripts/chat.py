@@ -10,7 +10,7 @@ import uuid
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from chinook.app.agents import build_supervisor
+from chinook.agent.team import build_supervisor
 from chinook.foundation.context import CustomerContext
 
 

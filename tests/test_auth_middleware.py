@@ -6,8 +6,8 @@ from helpers import FakeModel, call, once_then, tool_results
 from langchain_core.messages import AIMessage
 from langgraph.checkpoint.memory import InMemorySaver
 
-from chinook.app import agents
-from chinook.app.middleware import AuthMiddleware
+from chinook.agent import team
+from chinook.agent.middleware import AuthMiddleware
 from chinook.domain import refunds
 from chinook.foundation import config
 from chinook.foundation.context import CustomerContext
@@ -50,7 +50,7 @@ def latest_then_answer(messages):
 
 
 def graph(sub_respond=None, delegate_to="ask_music_recommendation"):
-    return agents.build_supervisor(
+    return team.build_supervisor(
         checkpointer=InMemorySaver(),
         model=once_then(call(delegate_to, {"task": "go"}), "answered"),
         subagent_model=FakeModel(respond=sub_respond) if sub_respond else once_then(
@@ -102,13 +102,13 @@ def test_a_thread_cannot_change_owner():
 
 
 def test_no_tool_can_write_the_verified_id():
-    for spec in agents.SUBAGENTS:
+    for spec in team.SUBAGENTS:
         for tool in spec.tools:
             assert "verified_customer_id" not in (tool.func.__code__.co_names + tool.func.__code__.co_consts)
 
 
 def test_a_store_outage_refuses_instead_of_crashing(monkeypatch):
-    monkeypatch.setattr("chinook.app.middleware.thread_id", lambda: "t1")
+    monkeypatch.setattr("chinook.agent.middleware.thread_id", lambda: "t1")
     monkeypatch.setattr(store, "bind_thread", lambda *a: (_ for _ in ()).throw(OSError("gone")))
 
     assert hook(54)["messages"][0].text == config.DATA_UNAVAILABLE
@@ -120,7 +120,7 @@ live = pytest.mark.skipif(not __import__("os").getenv("OPENAI_API_KEY"), reason=
 @pytest.mark.live
 @live
 def test_the_llm_fallback_reads_a_spelled_out_number():
-    from chinook.app.middleware import llm_phone
+    from chinook.agent.middleware import llm_phone
     from chinook.domain import auth
 
     phone = auth.extract_phone("it's two zero four, four five two, six four five two", llm_phone)
@@ -133,7 +133,7 @@ def test_the_llm_fallback_reads_a_spelled_out_number():
 def test_a_real_anonymous_login_answers_the_saved_question():
     from chinook.helpers import catalog
 
-    g = agents.build_supervisor(checkpointer=InMemorySaver())
+    g = team.build_supervisor(checkpointer=InMemorySaver())
     for text in ("What album am I closest to finishing?", AARON_PHONE):
         say(g, text, thread="live-login")
     answer = say(g, "123456", thread="live-login")["messages"][-1].text

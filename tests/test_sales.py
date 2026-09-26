@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from chinook.app import agents
+from chinook.agent import team
 from chinook.foundation import config
 from chinook.foundation.context import CustomerContext
 from chinook.helpers import catalog, store
@@ -26,7 +26,7 @@ def buys_the_first_offer(messages):
 
 
 def supervisor(sub_respond, task="buy In Step", model=None):
-    return agents.build_supervisor(
+    return team.build_supervisor(
         checkpointer=InMemorySaver(),
         model=model or once_then(call("ask_music_recommendation", {"task": task}), "relayed"),
         subagent_model=FakeModel(respond=sub_respond))
@@ -90,7 +90,7 @@ def test_a_made_up_price_is_retried_inside_the_graph():
         retried = any(isinstance(m, HumanMessage) and m.text == config.PRICE_RETRY for m in messages)
         return AIMessage("In Step is $4.75." if retried else "In Step is $3.99.")
 
-    agent = agents.build_subagent(agents.spec_named("music_recommendation"),
+    agent = team.build_subagent(team.spec_named("music_recommendation"),
                                   model=FakeModel(respond=invents_then_corrects))
     result = agent.invoke({"messages": [{"role": "user", "content": "finish?"}]},
                           context=CustomerContext(customer_id=48))
@@ -99,7 +99,7 @@ def test_a_made_up_price_is_retried_inside_the_graph():
 
 
 def live_graph():
-    return agents.build_supervisor(checkpointer=InMemorySaver())
+    return team.build_supervisor(checkpointer=InMemorySaver())
 
 
 def calls(result, name):
@@ -118,7 +118,7 @@ def test_live_what_should_i_finish():
 @pytest.mark.live
 @live
 def test_live_a_squashed_artist_name_resolves():
-    agent = agents.build_subagent(agents.spec_named("music_recommendation"))
+    agent = team.build_subagent(team.spec_named("music_recommendation"))
     result = agent.invoke({"messages": [{"role": "user", "content": "anything by acdc?"}]},
                           context=CustomerContext(customer_id=48))
 
