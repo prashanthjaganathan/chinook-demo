@@ -57,3 +57,21 @@ def test_the_first_claim_on_a_thread_wins():
 def test_request_keys_are_scoped_to_thread_and_call():
     assert store.request_key("t1", "c1") == store.request_key("t1", "c1")
     assert len({store.request_key(t, c) for t, c in [("t1", "c1"), ("t2", "c1"), ("t1", "c2")]}) == 3
+
+
+def test_preferences_are_empty_then_upserted():
+    assert store.get_preferences(48) == {}
+    store.save_preferences(48, {"genres": ["Rock"]})
+    store.save_preferences(48, {"genres": ["Jazz"], "device": "apple"})
+
+    assert store.get_preferences(48) == {"genres": ["Jazz"], "device": "apple"}
+    assert store.get_preferences(54) == {}
+
+
+def test_a_replayed_order_is_recorded_once():
+    order = {"customer_id": 48, "album_id": 205, "offer_id": "205-abc", "amount": "4.75"}
+    first = store.record_order("k1", **order)
+    again = store.record_order("k1", **{**order, "amount": "0.01"})
+
+    assert first == again and again["amount"] == "4.75"
+    assert len(store.execute("SELECT * FROM orders")) == 1

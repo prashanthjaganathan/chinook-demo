@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 import sqlite3
 from pathlib import Path
@@ -26,6 +27,19 @@ CREATE TABLE IF NOT EXISTS thread_owners (
     thread_id TEXT PRIMARY KEY,
     customer_id INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS preferences (
+    customer_id INTEGER PRIMARY KEY,
+    data TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS orders (
+    request_key TEXT PRIMARY KEY,
+    customer_id INTEGER NOT NULL,
+    album_id INTEGER NOT NULL,
+    offer_id TEXT NOT NULL,
+    amount TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 MATCHED = ("customer_id", "invoice_line_id", "track_id", "action", "replacement_track_id")
 
@@ -45,6 +59,16 @@ def connect() -> sqlite3.Connection:
     connection.execute("PRAGMA busy_timeout=10000")
     connection.executescript(SCHEMA)
     return connection
+
+
+def execute(sql: str, params=()) -> list[dict]:
+    connection = connect()
+    try:
+        rows = [dict(row) for row in connection.execute(sql, params)]
+        connection.commit()
+        return rows
+    finally:
+        connection.close()
 
 
 def request_key(thread_id: str, tool_call_id: str) -> str:
@@ -77,26 +101,33 @@ def record(key: str, **fields) -> dict:
 
 
 def open_requests(customer_id: int) -> list[dict]:
-    connection = connect()
-    try:
-        rows = connection.execute(
-            "SELECT * FROM refund_requests WHERE customer_id = ? ORDER BY created_at",
-            (catalog.valid_id(customer_id, "customer_id"),))
-        return [dict(row) for row in rows]
-    finally:
-        connection.close()
+    return execute("SELECT * FROM refund_requests WHERE customer_id = ? ORDER BY created_at",
+                   (catalog.valid_id(customer_id, "customer_id"),))
 
 
 def bind_thread(thread_id: str, customer_id: int) -> int:
     """Claims a thread for a customer; the first claim wins, and the owner is returned."""
-    connection = connect()
-    try:
-        connection.execute(
-            "INSERT OR IGNORE INTO thread_owners (thread_id, customer_id) VALUES (?, ?)",
+    execute("INSERT OR IGNORE INTO thread_owners (thread_id, customer_id) VALUES (?, ?)",
             (str(thread_id), catalog.valid_id(customer_id, "customer_id")))
-        connection.commit()
-        return connection.execute(
-            "SELECT customer_id FROM thread_owners WHERE thread_id = ?",
-            (str(thread_id),)).fetchone()["customer_id"]
-    finally:
-        connection.close()
+    return execute("SELECT customer_id FROM thread_owners WHERE thread_id = ?",
+                   (str(thread_id),))[0]["customer_id"]
+
+
+def get_preferences(customer_id: int) -> dict:
+    rows = execute("SELECT data FROM preferences WHERE customer_id = ?",
+                   (catalog.valid_id(customer_id, "customer_id"),))
+    return json.loads(rows[0]["data"]) if rows else {}
+
+
+def save_preferences(customer_id: int, preferences: dict) -> None:
+    execute("""INSERT INTO preferences (customer_id, data) VALUES (?, ?)
+               ON CONFLICT(customer_id) DO UPDATE SET data = excluded.data, updated_at = datetime('now')""",
+            (catalog.valid_id(customer_id, "customer_id"), json.dumps(preferences)))
+
+
+def record_order(key: str, **fields) -> dict:
+    # Same key twice (a replayed approval) records one order.
+    execute("""INSERT OR IGNORE INTO orders (request_key, customer_id, album_id, offer_id, amount)
+               VALUES (:request_key, :customer_id, :album_id, :offer_id, :amount)""",
+            {"request_key": key, **fields})
+    return execute("SELECT * FROM orders WHERE request_key = ?", (key,))[0]
