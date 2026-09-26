@@ -169,5 +169,5 @@ def build_supervisor(checkpointer=None, model=None, subagent_model=None, specs=S
 
 
 def graph():
-    """Studio entrypoint"""
+    """Studio entrypoint. The Agent Server adds its own checkpointer, which HITL uses; chat.py passes one."""
     return build_supervisor()
