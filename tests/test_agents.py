@@ -19,15 +19,15 @@ def test_the_registry_names_both_specialists():
     assert [s.name for s in agents.SUBAGENTS] == ["music_recommendation", "invoice_support"]
 
 
-def test_music_recommendation_can_price_but_not_read_invoices():
+def test_music_recommendation_uses_the_engine_but_not_invoices():
     names = {t.name for t in agents.spec_named("music_recommendation").tools}
 
-    assert "price_completion" in names and "get_invoice" not in names
+    assert "recommend_engine" in names and "get_invoice" not in names
 
 
 def test_a_subagent_runs_its_tools_with_the_given_customer():
     result = ask("music_recommendation", "what should I finish?", 48,
-                 model=once_then(call("price_completion", {"limit": 1})))
+                 model=once_then(call("recommend_engine", {"mode": "complete_album"})))
 
     assert '"In Step"' in tool_results(result["messages"])[0].content or "In Step" in str(
         tool_results(result["messages"])[0].content)

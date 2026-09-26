@@ -2,12 +2,13 @@ from decimal import Decimal
 
 from helpers import runtime_for
 
-from chinook import catalog, config, pricing
+from chinook import catalog, config, pricing, store
 from chinook.tools import (
-    get_invoice, get_my_library, price_completion, readable, search_catalog,
+    buy_completion, describe_purchase, get_invoice, get_my_library, readable, recommend_engine,
+    search_catalog,
 )
 
-TOOLS = (get_my_library, get_invoice, search_catalog, price_completion)
+TOOLS = (get_my_library, get_invoice, search_catalog, recommend_engine, buy_completion)
 
 
 def run(tool, customer_id, **args):
@@ -30,7 +31,8 @@ def test_tools_read_the_customer_from_context():
 def test_missing_context_gets_the_fixed_no_identity_result():
     assert run(get_my_library, None) == {"error": config.NO_IDENTITY}
     assert run(get_invoice, None) == {"error": config.NO_IDENTITY}
-    assert run(price_completion, None) == [{"error": config.NO_IDENTITY}]
+    assert run(recommend_engine, None, mode="for_me") == {"error": config.NO_IDENTITY}
+    assert run(buy_completion, None, offer_id="x") == {"error": config.NO_IDENTITY}
 
 
 def test_invoice_tool_hides_foreign_invoices_and_defaults_to_latest():
@@ -51,17 +53,44 @@ def test_prices_reach_the_model_as_exact_strings():
     assert all(r["unit_price"] == "0.99" for r in run(get_my_library, 54))
 
 
-def test_price_completion_matches_the_pricing_rule_for_customer_48():
-    offer = run(price_completion, 48, album_id=205)[0]
+def in_step_offer():
+    return run(recommend_engine, 48, mode="complete_album")["offers"][0]
+
+
+def test_recommend_engine_prices_in_step_for_customer_48():
+    offer = in_step_offer()
     expected = pricing.completion_price([t["unit_price"] for t in catalog.missing_tracks(48, 205)])
 
-    assert (offer["owned_tracks"], offer["total_tracks"], offer["missing_count"]) == (4, 10, 6)
+    assert (offer["owned_tracks"], offer["total_tracks"], len(offer["missing_tracks"])) == (4, 10, 6)
     assert offer["final_price"] == str(expected["final_price"]) == "4.75"
-    assert len(offer["missing_tracks"]) == 6
 
 
-def test_price_completion_listing_omits_track_names_and_respects_limit():
-    offers = run(price_completion, 48, limit=2)
+def test_recommend_engine_saves_stated_taste():
+    result = run(recommend_engine, 48, mode="complete_album",
+                 new_preferences={"device": "other", "genres": ["blues"]})
 
-    assert len(offers) == 2 and "missing_tracks" not in offers[0]
-    assert run(price_completion, 48, album_id=999999) == []
+    assert result["saved_preferences"] == {"device": "other", "genres": ["Blues"], "artists": []}
+
+
+def test_buy_completion_refuses_a_changed_or_foreign_offer():
+    offer_id = in_step_offer()["offer_id"]
+
+    assert run(buy_completion, 48, offer_id="205-stale") == {"error": config.OFFER_CHANGED}
+    assert run(buy_completion, 54, offer_id=offer_id) == {"error": config.OFFER_CHANGED}
+
+
+def test_a_replayed_purchase_records_one_order():
+    offer_id = in_step_offer()["offer_id"]
+    first = run(buy_completion, 48, offer_id=offer_id)
+    again = run(buy_completion, 48, offer_id=offer_id)
+
+    assert first == again == {"status": "confirmed", "album": "In Step", "tracks": 6, "amount": "4.75"}
+    assert len(store.execute("SELECT * FROM orders")) == 1
+
+
+def test_the_purchase_confirmation_is_readable():
+    offer_id = in_step_offer()["offer_id"]
+    tool_call = {"args": {"offer_id": offer_id}}
+
+    assert describe_purchase(tool_call, {}, runtime_for(48)) == "Buy 6 tracks on In Step for $4.75?"
+    assert describe_purchase(tool_call, {}, runtime_for(54)) == "This offer is no longer valid."

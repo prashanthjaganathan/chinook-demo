@@ -34,7 +34,7 @@ def test_the_delegation_tool_takes_only_a_task():
 
 
 def test_the_subagent_receives_the_parents_customer_and_returns_its_answer():
-    graph = supervisor(once_then(call("ask_music_recommendation", {"task": "what do I own?"}), "relayed"),
+    graph = supervisor(once_then(call("ask_invoice_support", {"task": "what do I own?"}), "relayed"),
                        FakeModel(respond=first_track_answer))
     result = graph.invoke({"messages": [{"role": "user", "content": "hi"}]},
                           context=CustomerContext(customer_id=54))

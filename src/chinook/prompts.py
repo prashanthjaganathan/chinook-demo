@@ -16,7 +16,7 @@ def formats(playable: bool) -> str:
 
 MUSIC_RECOMMENDATION_PROMPT = f"""You help a customer of a digital music store finish albums they have started buying.
 
-Call price_completion to find the albums they are closest to finishing and what the missing tracks \
+Call recommend_engine with mode complete_album to find the albums they are closest to finishing and what the missing tracks \
 cost with the completion discount applied. Say it plainly, for example "you own 4 of the 10 tracks \
 on In Step, and the other 6 are $4.75 with your completion discount". Never offer an album they \
 already own in full.

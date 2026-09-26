@@ -73,7 +73,7 @@ def test_error_messages_leak_no_internals():
 def test_a_failing_tool_reaches_the_model_marked_as_an_error(monkeypatch):
     monkeypatch.setattr("chinook.catalog.get_library",
                         lambda *a: (_ for _ in ()).throw(sqlite3.OperationalError("locked")))
-    result = agents.build_subagent(agents.spec_named("music_recommendation"),
+    result = agents.build_subagent(agents.spec_named("invoice_support"),
                                    model=once_then(call("get_my_library"))).invoke(
         {"messages": [{"role": "user", "content": "go"}]}, context=CustomerContext(customer_id=54))
     message = tool_results(result["messages"])[0]
@@ -94,7 +94,7 @@ def test_middleware_order_is_guard_then_errors_and_retry_then_fallback():
 
 def test_a_runaway_subagent_stops_with_a_message():
     looping = FakeModel(respond=lambda m: call("get_my_library", call_id=f"c{len(m)}"))
-    result = agents.build_subagent(agents.spec_named("music_recommendation"), model=looping).invoke(
+    result = agents.build_subagent(agents.spec_named("invoice_support"), model=looping).invoke(
         {"messages": [{"role": "user", "content": "go"}]}, context=CustomerContext(customer_id=54))
 
     assert len(tool_results(result["messages"])) <= config.SUBAGENT_TOOL_CALLS_PER_RUN
@@ -113,7 +113,7 @@ def test_parallel_calls_past_the_limit_do_not_crash():
     both = FakeModel(respond=lambda m: AIMessage("", tool_calls=[
         {"name": "get_my_library", "args": {}, "id": f"a{len(m)}"},
         {"name": "search_catalog", "args": {}, "id": f"b{len(m)}"}]))
-    result = agents.build_subagent(agents.spec_named("music_recommendation"), model=both).invoke(
+    result = agents.build_subagent(agents.spec_named("invoice_support"), model=both).invoke(
         {"messages": [{"role": "user", "content": "go"}]}, context=CustomerContext(customer_id=54))
 
     assert result["messages"][-1].text

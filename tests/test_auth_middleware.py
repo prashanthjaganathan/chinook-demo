@@ -50,7 +50,7 @@ def graph(sub_respond=None, delegate_to="ask_music_recommendation"):
         checkpointer=InMemorySaver(),
         model=once_then(call(delegate_to, {"task": "go"}), "answered"),
         subagent_model=FakeModel(respond=sub_respond) if sub_respond else once_then(
-            call("price_completion", {"limit": 1})),
+            call("recommend_engine", {"mode": "complete_album"})),
         auth=AuthMiddleware(llm_fallback=None))
 
 

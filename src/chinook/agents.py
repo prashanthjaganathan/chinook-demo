@@ -12,7 +12,7 @@ from chinook import config, models, observability, prompts
 from chinook.context import CustomerContext
 from chinook.middleware import AuthMiddleware, SessionGuard, atool_error, model_failure, tool_error
 from chinook.tools import (
-    get_invoice, get_my_library, price_completion, request_refund_or_swap, resolve_customer,
+    get_invoice, get_my_library, recommend_engine, request_refund_or_swap, resolve_customer,
     search_catalog,
 )
 
@@ -34,7 +34,7 @@ SUBAGENTS = (
         "music_recommendation",
         "Finds albums the customer has partly bought and prices the missing tracks.",
         prompts.MUSIC_RECOMMENDATION_PROMPT,
-        (get_my_library, search_catalog, price_completion),
+        (recommend_engine,),
     ),
     AgentSpec(
         "invoice_support",

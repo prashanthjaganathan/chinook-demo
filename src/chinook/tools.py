@@ -1,8 +1,10 @@
 from decimal import Decimal
+from typing import Literal
 
 from langchain.tools import ToolRuntime, tool
+from pydantic import BaseModel
 
-from chinook import catalog, config, pricing, store
+from chinook import catalog, config, engine, store
 from chinook.context import CustomerContext
 
 
@@ -70,29 +72,63 @@ def search_catalog(
     ))
 
 
-@tool
-def price_completion(
-    runtime: ToolRuntime[CustomerContext], album_id: int | None = None, limit: int = 5
-) -> list[dict]:
-    """Price finishing albums this customer has started buying, closest to complete first.
+class Preferences(BaseModel):
+    device: Literal["apple", "other"] | None = None
+    genres: list[str] = []
+    artists: list[str] = []
 
-    With an album_id, also lists the missing tracks. Prices include the completion discount.
+
+@tool
+def recommend_engine(
+    runtime: ToolRuntime[CustomerContext],
+    mode: Literal["complete_album", "by_artist", "similar_to_track", "for_me"],
+    seed: str | None = None,
+    seed_id: int | None = None,
+    new_preferences: Preferences | None = None,
+) -> dict:
+    """Recommend music, find albums to finish, and remember the customer's taste.
+
+    Pass an artist or song as seed exactly as the customer wrote it. When they pick from
+    returned choices, pass that choice's id as seed_id. Pass any taste they state in new_preferences.
     """
     customer_id = customer_of(runtime)
     if customer_id is None:
-        return [{"error": config.NO_IDENTITY}]
-    albums = catalog.partial_albums(customer_id)
-    if album_id is not None:
-        albums = [a for a in albums if a["album_id"] == album_id]
-    offers = []
-    for album in albums[:limit]:
-        missing = catalog.missing_tracks(customer_id, album["album_id"])
-        offer = {**album, **pricing.completion_price([t["unit_price"] for t in missing]),
-                 "missing_count": len(missing)}
-        if album_id is not None:
-            offer["missing_tracks"] = missing
-        offers.append(offer)
-    return readable(offers)
+        return {"error": config.NO_IDENTITY}
+    prefs = new_preferences.model_dump(exclude_none=True) if new_preferences else None
+    return readable(engine.recommend(customer_id, mode, seed, seed_id, prefs))
+
+
+@tool
+def buy_completion(runtime: ToolRuntime[CustomerContext], offer_id: str) -> dict:
+    """Buy the missing tracks of an album, using an offer_id from recommend_engine.
+
+    The customer confirms before anything is recorded.
+    """
+    customer_id = customer_of(runtime)
+    if customer_id is None:
+        return {"error": config.NO_IDENTITY}
+    offer = engine.current_offer(customer_id, offer_id)
+    if offer is None:
+        return {"error": config.OFFER_CHANGED}
+    thread_id = (runtime.config or {}).get("configurable", {}).get("thread_id", "")
+    order = store.record_order(
+        store.request_key(str(thread_id), str(runtime.tool_call_id)),
+        customer_id=customer_id, album_id=offer["album_id"], offer_id=offer_id,
+        amount=str(offer["final_price"]))
+    return {"status": "confirmed", "album": offer["album"],
+            "tracks": len(offer["missing_tracks"]), "amount": order["amount"]}
+
+
+def describe_purchase(tool_call, state, runtime) -> str:
+    """The confirmation the customer sees, in words rather than an offer id."""
+    customer_id = customer_of(runtime)
+    offer = engine.current_offer(customer_id, tool_call["args"].get("offer_id", "")) if customer_id else None
+    if offer is None:
+        return "This offer is no longer valid."
+    return f"Buy {len(offer['missing_tracks'])} tracks on {offer['album']} for ${offer['final_price']}?"
+
+
+APPROVAL_TEXT = {"buy_completion": describe_purchase}
 
 
 @tool
