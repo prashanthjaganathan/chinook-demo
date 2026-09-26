@@ -58,3 +58,6 @@ MODEL_CHAIN = (
 # Median call is ~1.6s but the tail reaches ~9s, so the timeout sits well above it.
 MODEL_TIMEOUT_SECONDS = 30
 MODEL_MAX_RETRIES = 1
+NOT_YOUR_PURCHASE = "That track is not on this account."
+REQUEST_NOT_DONE = "The request was not completed, so nothing was changed."
+REFUND_ACTIONS = ("refund", "swap")

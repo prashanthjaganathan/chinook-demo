@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from langchain.tools import ToolRuntime, tool
 
-from chinook import catalog, config, pricing
+from chinook import catalog, config, pricing, store
 from chinook.context import CustomerContext
 
 
@@ -88,3 +88,52 @@ def price_completion(
             offer["missing_tracks"] = missing
         offers.append(offer)
     return readable(offers)
+
+
+@tool
+def request_refund_or_swap(
+    runtime: ToolRuntime[CustomerContext],
+    track_id: int,
+    action: str,
+    reason: str,
+    replacement_track_id: int | None = None,
+) -> dict:
+    """Raise a refund or a replacement for a track this customer bought.
+
+    action is "refund" or "swap"; a swap needs replacement_track_id. The amount comes from the
+    original purchase. A human reviews this before anything is recorded.
+    """
+    customer_id = customer_of(runtime)
+    if customer_id is None:
+        return {"error": config.NO_IDENTITY}
+    if action not in config.REFUND_ACTIONS:
+        return {"error": "action must be refund or swap."}
+    if not reason or not reason.strip() or len(reason) > config.MAX_REASON:
+        return {"error": f"reason must be 1 to {config.MAX_REASON} characters."}
+    if (action == "swap") != (replacement_track_id is not None):
+        return {"error": "a swap needs a replacement track, and a refund cannot name one."}
+
+    purchase = catalog.purchase_of(customer_id, track_id)
+    if purchase is None:
+        return {"error": config.NOT_YOUR_PURCHASE}
+    if action == "swap":
+        problem = catalog.check_swap(customer_id, track_id, replacement_track_id)
+        if problem:
+            return {"error": problem}
+
+    thread_id = (runtime.config or {}).get("configurable", {}).get("thread_id", "")
+    try:
+        recorded = store.record(
+            store.request_key(str(thread_id), str(runtime.tool_call_id)),
+            customer_id=customer_id,
+            invoice_line_id=purchase["invoice_line_id"],
+            track_id=track_id,
+            action=action,
+            replacement_track_id=replacement_track_id,
+            amount=str(purchase["unit_price"]),
+            reason=reason.strip(),
+        )
+    except Exception:
+        return {"error": config.REQUEST_NOT_DONE}
+    return {"status": recorded["status"], "action": action, "track": purchase["track"],
+            "amount": recorded["amount"]}
