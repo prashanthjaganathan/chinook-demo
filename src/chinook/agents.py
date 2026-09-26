@@ -155,5 +155,5 @@ def build_supervisor(checkpointer=None, model=None, subagent_model=None, specs=S
 
 
 def graph():
-    """Studio entrypoint. The server supplies its own checkpointer and refuses one of ours."""
+    """Studio entrypoint"""
     return build_supervisor()
