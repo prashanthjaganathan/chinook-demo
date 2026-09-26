@@ -40,3 +40,11 @@ def find(customer_id: int, track=None, artist=None, wont_play_on=None, latest=Fa
             "purchases": [{"purchase_ref": purchase_ref(customer_id, l["invoice_line_id"]), "label": label(l)}
                           for l in top],
             "reasons": config.REFUND_REASON_LABELS}
+
+
+def purchase_for_ref(customer_id: int, ref: str) -> dict | None:
+    """A ref only resolves for the customer it was issued to."""
+    line_id = str(ref).split("-", 1)[0]
+    line = next((l for l in catalog.customer_purchases(customer_id)
+                 if str(l["invoice_line_id"]) == line_id), None)
+    return line if line and purchase_ref(customer_id, line["invoice_line_id"]) == ref else None

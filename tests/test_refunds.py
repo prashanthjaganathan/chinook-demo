@@ -47,3 +47,14 @@ def test_android_ranks_protected_lines_first_but_still_finds_an_mp3_by_name():
 
 def test_another_customers_track_is_never_a_candidate():
     assert refunds.find(1, track="midnight")["status"] == "not_found"
+
+
+def test_a_ref_resolves_only_for_its_own_customer_and_unedited():
+    ref = refunds.find(54, track="midnight")["purchases"][0]["purchase_ref"]
+    line_id = ref.split("-")[0]
+
+    assert refunds.purchase_for_ref(54, ref)["track"] == "Midnight"
+    assert refunds.purchase_for_ref(1, ref) is None
+    assert refunds.purchase_for_ref(54, f"{line_id}-0000000000") is None
+    assert refunds.purchase_for_ref(54, line_id) is None
+    assert refunds.purchase_for_ref(54, "junk") is None
