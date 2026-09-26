@@ -33,3 +33,5 @@ def media_kind(media_type: str) -> str:
 MAX_SEARCH_TEXT = 100
 MAX_SEARCH_RESULTS = 50
 MAX_REASON = 500
+
+INVOICE_NOT_FOUND = "Invoice not found on this account."
