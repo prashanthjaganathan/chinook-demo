@@ -14,25 +14,17 @@ EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 NAMES_SQL = "SELECT FirstName AS first, LastName AS last FROM Customer"
 
 
-def names_pattern() -> re.Pattern:
-    names = {part for row in catalog.query(NAMES_SQL, ()) for part in (row["first"], row["last"])}
-    longest_first = sorted((n for n in names if len(n) > 2), key=len, reverse=True)
-    return re.compile(r"\b(" + "|".join(map(re.escape, longest_first)) + r")\b")
-
-
-def mask_text(text: str, names: re.Pattern | None = None) -> str:
-    text = EMAIL.sub("<email>", PHONE.sub("<phone>", text))
-    return (names or names_pattern()).sub("<name>", text)
-
-
-def masking_client() -> Client:
-    names = names_pattern()
-    return Client(anonymizer=create_anonymizer(lambda text, path: mask_text(text, names)))
-
-
 def enable_masking() -> None:
-    # Every LangChain trace in this process goes through the masking client, Studio included.
-    langsmith.configure(client=masking_client())
+    """Masks phones, emails, and customer names in every LangChain trace in this process, Studio included."""
+    names = {part for row in catalog.query(NAMES_SQL, ()) for part in (row["first"], row["last"])}
+    # Longest first, so "Mary Ann" is masked before "Mary"; one compiled pattern keeps it fast.
+    longest_first = sorted((n for n in names if len(n) > 2), key=len, reverse=True)
+    name = re.compile(r"\b(" + "|".join(map(re.escape, longest_first)) + r")\b")
+
+    def mask(text: str, path) -> str:
+        return name.sub("<name>", EMAIL.sub("<email>", PHONE.sub("<phone>", text)))
+
+    langsmith.configure(client=Client(anonymizer=create_anonymizer(mask)))
 
 
 def prompt_version(specs) -> str:
