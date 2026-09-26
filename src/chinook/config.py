@@ -1,4 +1,7 @@
+from collections.abc import Mapping
+from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
 
 
 def valid_discount(value: Decimal) -> Decimal:
@@ -35,3 +38,23 @@ MAX_SEARCH_RESULTS = 50
 MAX_REASON = 500
 
 INVOICE_NOT_FOUND = "Invoice not found on this account."
+NO_IDENTITY = "I cannot see who is signed in, so I cannot open this account."
+NO_PURCHASES = "There are no purchases on this account yet."
+
+
+@dataclass(frozen=True)
+class ModelSpec:
+    name: str
+    api_key_env: str | None = None
+    options: Mapping[str, Any] | None = None
+
+
+# Tried in order. Add a provider by appending; reuse one with a second key via api_key_env.
+MODEL_CHAIN = (
+    # gpt-5.6-luna rejects function tools on /v1/chat/completions; the Responses API accepts them.
+    ModelSpec("openai:gpt-5.6-luna", "OPENAI_API_KEY", {"use_responses_api": True}),
+    ModelSpec("anthropic:claude-sonnet-4-6", "ANTHROPIC_API_KEY"),
+)
+# Median call is ~1.6s but the tail reaches ~9s, so the timeout sits well above it.
+MODEL_TIMEOUT_SECONDS = 30
+MODEL_MAX_RETRIES = 1
