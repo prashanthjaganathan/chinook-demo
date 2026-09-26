@@ -147,6 +147,21 @@ ORDER BY i.InvoiceDate DESC, il.InvoiceLineId DESC
 LIMIT 1
 """
 
+# Every line this customer bought, newest first.
+PURCHASES_SQL = """
+SELECT il.InvoiceLineId AS invoice_line_id, il.InvoiceId AS invoice_id,
+       date(i.InvoiceDate) AS invoice_date, il.TrackId AS track_id, t.Name AS track,
+       ar.Name AS artist, m.Name AS media_type, il.UnitPrice AS unit_price
+FROM Invoice i
+JOIN InvoiceLine il ON il.InvoiceId = i.InvoiceId
+JOIN Track t ON t.TrackId = il.TrackId
+JOIN Album al ON al.AlbumId = t.AlbumId
+JOIN Artist ar ON ar.ArtistId = al.ArtistId
+JOIN MediaType m ON m.MediaTypeId = t.MediaTypeId
+WHERE i.CustomerId = ?
+ORDER BY i.InvoiceDate DESC, il.InvoiceLineId DESC
+"""
+
 # Catalog tracks matching any filters. instr() is a literal test, so % and _ are not wildcards.
 SEARCH_SQL = """
 SELECT t.TrackId AS track_id, t.Name AS track, t.AlbumId AS album_id, al.Title AS album,
@@ -287,6 +302,10 @@ def track_info(track_id: int) -> dict | None:
 
 def top_genres() -> list[str]:
     return [row["name"] for row in query(TOP_GENRES_SQL, ())]
+
+
+def customer_purchases(customer_id: int) -> list[dict]:
+    return with_money(query(PURCHASES_SQL, (valid_id(customer_id, "customer_id"),)))
 
 
 def search_catalog(
