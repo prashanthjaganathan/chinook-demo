@@ -7,6 +7,7 @@ from langchain.tools import ToolRuntime, tool
 
 from chinook import models, prompts
 from chinook.context import CustomerContext
+from chinook.middleware import AuthMiddleware
 from chinook.tools import (
     get_invoice, get_my_library, price_completion, request_refund_or_swap, resolve_customer,
     search_catalog,
@@ -83,16 +84,16 @@ def delegate(spec: AgentSpec, subagent):
     return ask
 
 
-def supervisor_middleware() -> list:
-    return []
+def supervisor_middleware(auth=None) -> list:
+    return [auth or AuthMiddleware()]
 
 
-def build_supervisor(checkpointer=None, model=None, subagent_model=None, specs=SUBAGENTS):
+def build_supervisor(checkpointer=None, model=None, subagent_model=None, specs=SUBAGENTS, auth=None):
     return create_agent(
         model=model or models.primary(),
         tools=[delegate(spec, build_subagent(spec, model=subagent_model)) for spec in specs],
         system_prompt=prompts.supervisor_prompt(specs),
-        middleware=supervisor_middleware(),
+        middleware=supervisor_middleware(auth),
         context_schema=CustomerContext,
         checkpointer=checkpointer,
         name="supervisor",

@@ -61,3 +61,15 @@ MODEL_MAX_RETRIES = 1
 NOT_YOUR_PURCHASE = "That track is not on this account."
 REQUEST_NOT_DONE = "The request was not completed, so nothing was changed."
 REFUND_ACTIONS = ("refund", "swap")
+
+AUTH_MAX_ATTEMPTS = 3
+OTP_LENGTH_RANGE = (4, 8)
+ASK_PHONE = "Before I can look at your account, what's the phone number on it?"
+NO_PHONE = "I couldn't find a phone number in that. What's the number on your account?"
+# Same reply whether or not the number matches, so phone numbers cannot be probed.
+CODE_SENT = "If that number is on an account, I've sent a 6-digit code. What is it?"
+BAD_CODE = "That code didn't work. Check the number and try again."
+AUTH_LOCKED = "I couldn't verify your account. Please start a new conversation."
+AUTHENTICATED = "I was able to authenticate you."
+WRONG_OWNER = "This conversation belongs to a different account. Please start a new one."
+DATA_UNAVAILABLE = "I could not reach the store's records just now, so nothing was checked or changed."

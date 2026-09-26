@@ -181,6 +181,9 @@ FROM Invoice i JOIN InvoiceLine il ON il.InvoiceId = i.InvoiceId
 WHERE i.CustomerId = :customer_id AND il.TrackId IN (:original_id, :replacement_id)
 """
 
+# One row when this customer exists.
+CUSTOMER_EXISTS_SQL = "SELECT 1 AS present FROM Customer WHERE CustomerId = ?"
+
 # Every customer's phone, for matching on digits.
 PHONES_SQL = "SELECT CustomerId AS customer_id, Phone AS phone FROM Customer WHERE Phone IS NOT NULL"
 
@@ -284,3 +287,7 @@ def customer_by_phone(phone: str) -> int | None:
         if digits_only(row["phone"]) == wanted or digits_only(row["phone"])[-10:] == wanted[-10:]
     }
     return matches.pop() if len(matches) == 1 else None
+
+
+def customer_exists(customer_id: int) -> bool:
+    return bool(query(CUSTOMER_EXISTS_SQL, (valid_id(customer_id, "customer_id"),)))
