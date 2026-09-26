@@ -1,6 +1,6 @@
 import pytest
 
-from chinook.assembly import models
+from chinook.app import models
 from chinook.foundation import config
 
 

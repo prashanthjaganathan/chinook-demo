@@ -3,7 +3,7 @@ import os
 import pytest
 from helpers import call, once_then, tool_results
 
-from chinook.assembly import agents, prompts
+from chinook.app import agents, prompts
 from chinook.foundation import config
 from chinook.foundation.context import CustomerContext
 

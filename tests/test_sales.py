@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from chinook.assembly import agents
+from chinook.app import agents
 from chinook.foundation import config
 from chinook.foundation.context import CustomerContext
 from chinook.helpers import catalog, store

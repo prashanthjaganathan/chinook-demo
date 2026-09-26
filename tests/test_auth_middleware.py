@@ -6,8 +6,8 @@ from helpers import FakeModel, call, once_then, tool_results
 from langchain_core.messages import AIMessage
 from langgraph.checkpoint.memory import InMemorySaver
 
-from chinook.assembly import agents
-from chinook.assembly.middleware import AuthMiddleware
+from chinook.app import agents
+from chinook.app.middleware import AuthMiddleware
 from chinook.domain import refunds
 from chinook.foundation import config
 from chinook.foundation.context import CustomerContext
@@ -108,7 +108,7 @@ def test_no_tool_can_write_the_verified_id():
 
 
 def test_a_store_outage_refuses_instead_of_crashing(monkeypatch):
-    monkeypatch.setattr("chinook.assembly.middleware.thread_id", lambda: "t1")
+    monkeypatch.setattr("chinook.app.middleware.thread_id", lambda: "t1")
     monkeypatch.setattr(store, "bind_thread", lambda *a: (_ for _ in ()).throw(OSError("gone")))
 
     assert hook(54)["messages"][0].text == config.DATA_UNAVAILABLE
@@ -120,7 +120,7 @@ live = pytest.mark.skipif(not __import__("os").getenv("OPENAI_API_KEY"), reason=
 @pytest.mark.live
 @live
 def test_the_llm_fallback_reads_a_spelled_out_number():
-    from chinook.assembly.middleware import llm_phone
+    from chinook.app.middleware import llm_phone
     from chinook.domain import auth
 
     phone = auth.extract_phone("it's two zero four, four five two, six four five two", llm_phone)

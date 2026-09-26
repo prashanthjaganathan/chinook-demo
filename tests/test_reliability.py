@@ -10,14 +10,14 @@ from langchain_core.messages import AIMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from chinook.assembly import agents, models
-from chinook.assembly.middleware import (
+from chinook.app import agents, models
+from chinook.app.middleware import (
     SessionGuard,
     atool_error,
     model_failure,
     tool_error,
 )
-from chinook.assembly.tools import find_purchases
+from chinook.app.tools import find_purchases
 from chinook.foundation import config
 from chinook.foundation.context import CustomerContext
 from chinook.helpers import store

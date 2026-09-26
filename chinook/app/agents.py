@@ -13,8 +13,8 @@ from langchain.agents.middleware import (
 from langchain.tools import ToolRuntime, tool
 from langchain_core.messages import AIMessage, HumanMessage
 
-from chinook.assembly import models, observability, prompts, tools
-from chinook.assembly.middleware import (
+from chinook.app import models, observability, prompts, tools
+from chinook.app.middleware import (
     AuthMiddleware,
     MustUseATool,
     PriceGuard,
@@ -23,7 +23,7 @@ from chinook.assembly.middleware import (
     model_failure,
     tool_error,
 )
-from chinook.assembly.tools import (
+from chinook.app.tools import (
     buy_completion,
     find_purchases,
     recommend_engine,

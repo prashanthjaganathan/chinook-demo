@@ -7,7 +7,7 @@
   "python.testing.pytestArgs": ["tests"],
 
   "python.analysis.extraPaths": [
-    "${workspaceFolder}/src",
+    "${workspaceFolder}",
     "${workspaceFolder}/scripts"
   ],
   "python.analysis.autoImportCompletions": true,

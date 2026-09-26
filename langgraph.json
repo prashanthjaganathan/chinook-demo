@@ -1,6 +1,6 @@
 {
   "$schema": "https://langgra.ph/schema.json",
   "dependencies": ["."],
-  "graphs": { "support": "./src/chinook/assembly/agents.py:graph" },
+  "graphs": { "support": "./chinook/app/agents.py:graph" },
   "env": ".env"
 }

@@ -9,7 +9,7 @@ import pytest
 from chinook.foundation import config
 from chinook.helpers import catalog
 
-SOURCE = Path(__file__).resolve().parents[1] / "src" / "chinook"
+SOURCE = Path(__file__).resolve().parents[1] / "chinook"
 SQL_STARTS = ("SELECT", "INSERT", "UPDATE", "DELETE", "WITH", "CREATE", "DROP", "WHERE", "AND ")
 BAD_IDS = ("2", 2.0, 0, -1, 2**63, None, [1], True)
 

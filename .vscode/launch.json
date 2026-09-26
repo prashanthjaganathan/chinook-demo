@@ -13,7 +13,7 @@
       "cwd": "${workspaceFolder}",
       "envFile": "${workspaceFolder}/.env",
       "env": {
-        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/scripts",
+        "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/scripts",
         "PYDEVD_DISABLE_FILE_VALIDATION": "1"
       },
       "justMyCode": false
@@ -30,7 +30,7 @@
       "cwd": "${workspaceFolder}",
       "envFile": "${workspaceFolder}/.env",
       "env": {
-        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/scripts",
+        "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/scripts",
         "PYDEVD_DISABLE_FILE_VALIDATION": "1"
       },
       "justMyCode": false
@@ -44,7 +44,7 @@
       "cwd": "${workspaceFolder}",
       "envFile": "${workspaceFolder}/.env",
       "env": {
-        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/scripts",
+        "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/scripts",
         "PYDEVD_DISABLE_FILE_VALIDATION": "1"
       },
       "justMyCode": false
@@ -112,7 +112,7 @@
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "env": {
-        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/scripts",
+        "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/scripts",
         "PYDEVD_DISABLE_FILE_VALIDATION": "1"
       },
       "justMyCode": false

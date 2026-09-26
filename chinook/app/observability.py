@@ -5,7 +5,7 @@ import langsmith
 from langsmith import Client
 from langsmith.anonymizer import create_anonymizer
 
-from chinook.assembly import prompts
+from chinook.app import prompts
 from chinook.foundation import config
 from chinook.helpers import catalog
 

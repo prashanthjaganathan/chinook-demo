@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from helpers import runtime_for
 
-from chinook.assembly.tools import (
+from chinook.app.tools import (
     buy_completion,
     describe_purchase,
     find_purchases,
