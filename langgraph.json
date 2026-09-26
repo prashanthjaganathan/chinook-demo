@@ -2,7 +2,7 @@
   "$schema": "https://langgra.ph/schema.json",
   "dependencies": ["."],
   "graphs": {
-    "support": "./src/chinook_agent/agent.py:graph"
+    "support": "./src/chinook_agent/agent.py:music_store_agent"
   },
   "env": ".env"
 }

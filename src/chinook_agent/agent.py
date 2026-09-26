@@ -75,10 +75,8 @@ def build_agent(checkpointer=None):
         system_prompt=SYSTEM_PROMPT,
         middleware=middleware,
         context_schema=CustomerContext,
-        checkpointer=checkpointer or InMemorySaver(),
+        checkpointer=checkpointer,
     )
 
 
-def graph():
-    """Studio entrypoint. The Agent Server supplies its own checkpointer."""
-    return build_agent(checkpointer=None)
+music_store_agent = build_agent()

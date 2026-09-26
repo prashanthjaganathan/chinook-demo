@@ -32,6 +32,7 @@ def test_agent_wires_every_tool_into_the_graph(fake_keys):
 def test_agent_answers_what_do_i_own():
     result = agent.build_agent().invoke(
         {"messages": [{"role": "user", "content": "How many tracks do I own?"}]},
+        config={"configurable": {"thread_id": "live-library"}},
         context=CustomerContext(customer_id=54),
     )
 
@@ -43,6 +44,7 @@ def test_agent_answers_what_do_i_own():
 def test_agent_offers_missing_tracks_with_discounted_price():
     result = agent.build_agent().invoke(
         {"messages": [{"role": "user", "content": "What album am I closest to finishing, and what would the rest cost?"}]},
+        config={"configurable": {"thread_id": "live-completion"}},
         context=CustomerContext(customer_id=48),
     )
     answer = result["messages"][-1].text

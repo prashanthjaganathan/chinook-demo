@@ -11,3 +11,5 @@ data/*.db
 data/*.sqlite
 .langgraph_api/
 docs/
+merge_code.py
+merged_code.txt
