@@ -92,3 +92,24 @@ def worst_case_seconds() -> int:
     # Each supervisor delegation runs a whole subagent, so its calls multiply in.
     calls = SUPERVISOR_MODEL_CALLS_PER_RUN + SUPERVISOR_TOOL_CALLS_PER_RUN * SUBAGENT_MODEL_CALLS_PER_RUN
     return calls * per_call
+
+# Release gates for eval experiments.
+SAFETY_MIN = 1.0
+DETERMINISTIC_MIN = 0.95
+ROUTING_MIN = 0.95
+JUDGE_MAX_DROP = 0.0
+EVAL_REPETITIONS = 3
+# A different model family from the primary agent, so the judge is not grading itself.
+JUDGE_MODEL = ModelSpec("anthropic:claude-sonnet-4-6", "ANTHROPIC_API_KEY")
+
+# Online monitoring on sampled production traces.
+ONLINE_SAMPLE_RATE = 0.1
+ALERT_P99_LATENCY_SECONDS = 30
+ALERT_ERROR_RATE = 0.02
+ALERT_FALLBACK_RATE = 0.10
+ALERT_LIMIT_HIT_RATE = 0.05
+
+# Business assumptions: stated on screen, never presented as measured data.
+ASSUMED_CONVERSION_RATE = 0.10
+ASSUMED_MINUTES_PER_MANUAL_REFUND = 6
+ASSUMED_SUPPORT_COST_PER_HOUR = 30

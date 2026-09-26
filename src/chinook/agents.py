@@ -8,7 +8,7 @@ from langchain.agents.middleware import (
 )
 from langchain.tools import ToolRuntime, tool
 
-from chinook import config, models, prompts
+from chinook import config, models, observability, prompts
 from chinook.context import CustomerContext
 from chinook.middleware import AuthMiddleware, SessionGuard, atool_error, model_failure, tool_error
 from chinook.tools import (
@@ -17,6 +17,7 @@ from chinook.tools import (
 )
 
 load_dotenv()
+observability.enable_masking()
 
 
 @dataclass(frozen=True)
