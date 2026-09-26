@@ -33,6 +33,11 @@ def media_kind(media_type: str) -> str:
     return "video" if media_type in VIDEO_FORMATS else "audio"
 
 
+RECOMMEND_LIMIT = 5
+MAX_PREFERENCE_ITEMS = 5
+ASK_DEVICE = "Do you listen on an Apple device or something else?"
+ASK_GENRES = "What kinds of music do you like?"
+
 RESOLVE_CUTOFF = 0.8
 RESOLVE_MARGIN = 0.05
 # Nicknames that string matching can't guess, keyed by normalized form.
