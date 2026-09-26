@@ -8,7 +8,6 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
 from chinook.agent import team
-from chinook.foundation import config
 from chinook.foundation.context import CustomerContext
 from chinook.helpers import catalog, store
 
@@ -81,21 +80,6 @@ def test_the_specialist_sees_recent_turns_of_the_conversation():
         "recommend\n\nRecent conversation:\nCustomer: anything by Miles Davis?\n"
         "Assistant: Which one?\nCustomer: the second one",
     ]
-
-
-def test_a_made_up_price_is_retried_inside_the_graph():
-    def invents_then_corrects(messages):
-        if not tool_results(messages):
-            return call("recommend_engine", {"mode": "complete_album"})
-        retried = any(isinstance(m, HumanMessage) and m.text == config.PRICE_RETRY for m in messages)
-        return AIMessage("In Step is $4.75." if retried else "In Step is $3.99.")
-
-    agent = team.build_subagent(team.spec_named("music_recommendation"),
-                                  model=FakeModel(respond=invents_then_corrects))
-    result = agent.invoke({"messages": [{"role": "user", "content": "finish?"}]},
-                          context=CustomerContext(customer_id=48))
-
-    assert result["messages"][-1].text == "In Step is $4.75."
 
 
 def live_graph():

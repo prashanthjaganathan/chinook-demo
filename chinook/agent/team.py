@@ -17,7 +17,6 @@ from chinook.agent import models, observability, prompts, tools
 from chinook.agent.middleware import (
     AuthMiddleware,
     MustUseATool,
-    PriceGuard,
     SessionGuard,
     atool_error,
     model_failure,
@@ -55,7 +54,7 @@ SUBAGENTS = (
         prompts.MUSIC_RECOMMENDATION_PROMPT,
         (recommend_engine, buy_completion),
         approvals=("buy_completion",),
-        extras=(MustUseATool, PriceGuard),
+        extras=(MustUseATool,),
     ),
     AgentSpec(
         "invoice_support",
@@ -63,7 +62,7 @@ SUBAGENTS = (
         prompts.INVOICE_SUPPORT_PROMPT,
         (find_purchases, search_catalog, request_refund),
         approvals=("request_refund",),
-        extras=(MustUseATool, PriceGuard),
+        extras=(MustUseATool,),
     ),
 )
 
@@ -106,7 +105,7 @@ def subagent_middleware(spec: AgentSpec, spares=()) -> list:
     ]
 
 
-def configured(model):
+def configured(model) -> tuple:
     # An injected model replaces the configured chain entirely, fallbacks included.
     return (models.primary(), models.fallbacks()) if model is None else (model, [])
 

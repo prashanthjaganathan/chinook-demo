@@ -1,7 +1,5 @@
 import asyncio
-import re
 import sqlite3
-from decimal import Decimal
 from typing import NotRequired
 
 from langchain.agents import AgentState
@@ -131,32 +129,6 @@ class MustUseATool(AgentMiddleware):
 
     async def awrap_model_call(self, request, handler):
         return await handler(self.forced(request))
-
-
-PRICE = re.compile(r"\$\s?(\d+(?:\.\d{2})?)")
-AMOUNT = re.compile(r"\d+\.\d{2}")
-
-
-class PriceGuard(AgentMiddleware):
-    """A final answer may only quote prices that appear in this run's tool results."""
-
-    @hook_config(can_jump_to=["model"])
-    def after_model(self, state, runtime) -> dict | None:
-        answer = state["messages"][-1]
-        if not isinstance(answer, AIMessage) or answer.tool_calls:
-            return None
-        sourced = {Decimal(a) for m in state["messages"] if isinstance(m, ToolMessage)
-                   for a in AMOUNT.findall(m.text)}
-        if {Decimal(p) for p in PRICE.findall(answer.text)} <= sourced:
-            return None
-        # Retry once; after that, replace the answer (same id) with a safe one.
-        if any(isinstance(m, HumanMessage) and m.text == config.PRICE_RETRY for m in state["messages"]):
-            return {"messages": [AIMessage(config.PRICE_FALLBACK, id=answer.id)]}
-        return {"messages": [HumanMessage(config.PRICE_RETRY)], "jump_to": "model"}
-
-    @hook_config(can_jump_to=["model"])
-    async def aafter_model(self, state, runtime) -> dict | None:
-        return self.after_model(state, runtime)
 
 
 def refused_call(request, text: str) -> ToolMessage:

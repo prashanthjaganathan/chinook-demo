@@ -38,8 +38,6 @@ MAX_PREFERENCE_ITEMS = 5
 ASK_DEVICE = "Do you listen on an Apple device or something else?"
 ASK_GENRES = "What kinds of music do you like?"
 OFFER_CHANGED = "That offer has changed. Ask for the album again to get the current price."
-PRICE_RETRY = "Only quote prices exactly as they appear in the tool results."
-PRICE_FALLBACK = "I couldn't confirm those prices just now. Ask me again and I'll re-check them."
 
 RESOLVE_CUTOFF = 0.8
 RESOLVE_MARGIN = 0.05
