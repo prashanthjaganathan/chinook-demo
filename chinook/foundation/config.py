@@ -3,15 +3,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
-
-def valid_discount(value: Decimal) -> Decimal:
-    if not isinstance(value, Decimal) or not Decimal("0") <= value < Decimal("1"):
-        raise ValueError("discount must be a Decimal from 0 up to but not including 1")
-    return value
-
-
 # Chinook has no album price, so completion needs an explicit discount.
-COMPLETION_DISCOUNT = valid_discount(Decimal("0.20"))
+COMPLETION_DISCOUNT = Decimal("0.30")
 
 # Apple FairPlay DRM: these formats only play on Apple devices.
 PROTECTED_FORMATS = frozenset({"Protected AAC audio file", "Protected MPEG-4 video file"})
@@ -41,6 +34,7 @@ OFFER_CHANGED = "That offer has changed. Ask for the album again to get the curr
 
 RESOLVE_CUTOFF = 0.8
 RESOLVE_MARGIN = 0.05
+
 # Nicknames that string matching can't guess, keyed by normalized form.
 ALIASES = {"zep": "Led Zeppelin", "gnr": "Guns N' Roses", "rhcp": "Red Hot Chili Peppers"}
 
@@ -106,8 +100,8 @@ OTP_LENGTH_RANGE = (4, 8)
 ASK_PHONE = "Before I can look at your account, what's the phone number on it?"
 NO_PHONE = "I couldn't find a phone number in that. What's the number on your account?"
 # Same reply whether or not the number matches, so phone numbers cannot be probed.
-CODE_SENT = "If that number is on an account, I've sent a 6-digit code. What is it?"
-BAD_CODE = "That code didn't work. Check the number and try again."
+CODE_SENT = "I've sent a 6-digit code to the phone number on your account. Please enter it here."
+BAD_CODE = "That code didn't work. Please check the number and try again."
 AUTH_LOCKED = "I couldn't verify your account. Please start a new conversation."
 AUTHENTICATED = "I was able to authenticate you."
 WRONG_OWNER = "This conversation belongs to a different account. Please start a new one."
