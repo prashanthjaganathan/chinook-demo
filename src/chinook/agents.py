@@ -2,12 +2,15 @@ from dataclasses import dataclass
 
 from dotenv import load_dotenv
 from langchain.agents import create_agent
-from langchain.agents.middleware import HumanInTheLoopMiddleware
+from langchain.agents.middleware import (
+    HumanInTheLoopMiddleware, ModelCallLimitMiddleware, ModelFallbackMiddleware,
+    ModelRetryMiddleware, ToolCallLimitMiddleware, ToolErrorMiddleware,
+)
 from langchain.tools import ToolRuntime, tool
 
-from chinook import models, prompts
+from chinook import config, models, prompts
 from chinook.context import CustomerContext
-from chinook.middleware import AuthMiddleware
+from chinook.middleware import AuthMiddleware, SessionGuard, atool_error, model_failure, tool_error
 from chinook.tools import (
     get_invoice, get_my_library, price_completion, request_refund_or_swap, resolve_customer,
     search_catalog,
@@ -55,17 +58,42 @@ def approval(spec: AgentSpec) -> list:
     )]
 
 
-def subagent_middleware(spec: AgentSpec) -> list:
-    return approval(spec)
+def limits(model_calls: int, tool_calls: int, model_thread=None, tool_thread=None) -> list:
+    return [
+        ModelCallLimitMiddleware(run_limit=model_calls, thread_limit=model_thread, exit_behavior="end"),
+        ToolCallLimitMiddleware(run_limit=tool_calls, thread_limit=tool_thread, exit_behavior="end"),
+    ]
+
+
+def resilience(spares) -> list:
+    # Retry outside fallback: one attempt walks the whole chain, a retry walks it again.
+    stack = [ModelRetryMiddleware(max_retries=config.MODEL_MAX_RETRIES, on_failure=model_failure)]
+    return stack + ([ModelFallbackMiddleware(*spares)] if spares else [])
+
+
+def subagent_middleware(spec: AgentSpec, spares=()) -> list:
+    return [
+        SessionGuard(),
+        ToolErrorMiddleware(tool_error, aon_error=atool_error),
+        *limits(config.SUBAGENT_MODEL_CALLS_PER_RUN, config.SUBAGENT_TOOL_CALLS_PER_RUN),
+        *resilience(spares),
+        *approval(spec),
+    ]
+
+
+def configured(model):
+    # An injected model replaces the configured chain entirely, fallbacks included.
+    return (models.primary(), models.fallbacks()) if model is None else (model, [])
 
 
 def build_subagent(spec: AgentSpec, model=None, checkpointer=None):
+    model, spares = configured(model)
     # Subagents normally get no checkpointer, so an approval pause surfaces at the supervisor.
     return create_agent(
-        model=model or models.primary(),
+        model=model,
         tools=list(spec.tools),
         system_prompt=spec.prompt,
-        middleware=subagent_middleware(spec),
+        middleware=subagent_middleware(spec, spares),
         context_schema=CustomerContext,
         checkpointer=checkpointer,
         name=spec.name,
@@ -84,16 +112,22 @@ def delegate(spec: AgentSpec, subagent):
     return ask
 
 
-def supervisor_middleware(auth=None) -> list:
-    return [auth or AuthMiddleware()]
+def supervisor_middleware(auth=None, spares=()) -> list:
+    return [
+        auth or AuthMiddleware(),
+        *limits(config.SUPERVISOR_MODEL_CALLS_PER_RUN, config.SUPERVISOR_TOOL_CALLS_PER_RUN,
+                config.SUPERVISOR_MODEL_CALLS_PER_THREAD, config.SUPERVISOR_TOOL_CALLS_PER_THREAD),
+        *resilience(spares),
+    ]
 
 
 def build_supervisor(checkpointer=None, model=None, subagent_model=None, specs=SUBAGENTS, auth=None):
+    model, spares = configured(model)
     return create_agent(
-        model=model or models.primary(),
+        model=model,
         tools=[delegate(spec, build_subagent(spec, model=subagent_model)) for spec in specs],
         system_prompt=prompts.supervisor_prompt(specs),
-        middleware=supervisor_middleware(auth),
+        middleware=supervisor_middleware(auth, spares),
         context_schema=CustomerContext,
         checkpointer=checkpointer,
         name="supervisor",

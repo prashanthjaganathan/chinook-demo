@@ -4,7 +4,7 @@ from typing import NotRequired
 
 from langchain.agents import AgentState
 from langchain.agents.middleware import AgentMiddleware, hook_config
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.config import get_config
 from pydantic import BaseModel
 
@@ -44,7 +44,9 @@ class PhoneGuess(BaseModel):
 
 
 def llm_phone(text: str) -> str | None:
-    guess = models.primary().with_structured_output(PhoneGuess).invoke(
+    # Not an agent call, so the middleware chain does not cover it; fall back explicitly.
+    chain = [models.build(spec).with_structured_output(PhoneGuess) for spec in config.MODEL_CHAIN]
+    guess = chain[0].with_fallbacks(chain[1:]).invoke(
         f"Return the phone number in this message as digits only, or nothing:\n{text}")
     return guess.digits
 
@@ -95,3 +97,41 @@ class AuthMiddleware(AgentMiddleware):
     @hook_config(can_jump_to=["end"])
     async def abefore_agent(self, state, runtime) -> dict | None:
         return await asyncio.to_thread(self.before_agent, state, runtime)
+
+
+class SessionGuard(AgentMiddleware):
+    """Re-checks the customer before every subagent tool call, including after an approval resume."""
+
+    def wrap_tool_call(self, request, handler):
+        problem = session_problem(getattr(request.runtime.context, "customer_id", None))
+        return refused_call(request, problem) if problem else handler(request)
+
+    async def awrap_tool_call(self, request, handler):
+        customer_id = getattr(request.runtime.context, "customer_id", None)
+        problem = await asyncio.to_thread(session_problem, customer_id)
+        return refused_call(request, problem) if problem else await handler(request)
+
+
+def refused_call(request, text: str) -> ToolMessage:
+    return ToolMessage(content=text, name=request.tool_call["name"],
+                       tool_call_id=request.tool_call["id"], status="error")
+
+
+def tool_error(error: Exception, request=None) -> str | None:
+    """None re-raises. PermissionError subclasses OSError, so it is checked first."""
+    if isinstance(error, PermissionError):
+        return None
+    if isinstance(error, (sqlite3.Error, OSError)):
+        return config.DATA_UNAVAILABLE
+    if isinstance(error, ValueError):
+        return config.BAD_REQUEST
+    return None
+
+
+async def atool_error(error: Exception, request=None) -> str | None:
+    return tool_error(error)
+
+
+def model_failure(error: Exception) -> str:
+    # The provider's own error text can carry keys and endpoints, so it is never repeated.
+    return config.MODEL_UNAVAILABLE

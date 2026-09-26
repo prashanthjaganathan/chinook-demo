@@ -55,8 +55,8 @@ MODEL_CHAIN = (
     ModelSpec("openai:gpt-5.6-luna", "OPENAI_API_KEY", {"use_responses_api": True}),
     ModelSpec("anthropic:claude-sonnet-4-6", "ANTHROPIC_API_KEY"),
 )
-# Median call is ~1.6s but the tail reaches ~9s, so the timeout sits well above it.
-MODEL_TIMEOUT_SECONDS = 30
+# Legitimate calls reach ~9s; a hung call should fail over to the next model quickly.
+MODEL_TIMEOUT_SECONDS = 20
 MODEL_MAX_RETRIES = 1
 NOT_YOUR_PURCHASE = "That track is not on this account."
 REQUEST_NOT_DONE = "The request was not completed, so nothing was changed."
@@ -73,3 +73,22 @@ AUTH_LOCKED = "I couldn't verify your account. Please start a new conversation."
 AUTHENTICATED = "I was able to authenticate you."
 WRONG_OWNER = "This conversation belongs to a different account. Please start a new one."
 DATA_UNAVAILABLE = "I could not reach the store's records just now, so nothing was checked or changed."
+BAD_REQUEST = "That request was not valid, so nothing was changed."
+MODEL_UNAVAILABLE = "I could not reach the assistant service just now, so nothing was checked or changed."
+
+# Cost ceiling. Subagents have no checkpointer, so only per-run limits apply to them.
+SUPERVISOR_MODEL_CALLS_PER_RUN = 4
+SUPERVISOR_TOOL_CALLS_PER_RUN = 3
+SUPERVISOR_MODEL_CALLS_PER_THREAD = 40
+SUPERVISOR_TOOL_CALLS_PER_THREAD = 30
+SUBAGENT_MODEL_CALLS_PER_RUN = 6
+SUBAGENT_TOOL_CALLS_PER_RUN = 8
+# The pathological ceiling: every call times out, on every model, on every attempt.
+TURN_BUDGET_SECONDS = 1800
+
+
+def worst_case_seconds() -> int:
+    per_call = (1 + MODEL_MAX_RETRIES) * len(MODEL_CHAIN) * MODEL_TIMEOUT_SECONDS
+    # Each supervisor delegation runs a whole subagent, so its calls multiply in.
+    calls = SUPERVISOR_MODEL_CALLS_PER_RUN + SUPERVISOR_TOOL_CALLS_PER_RUN * SUBAGENT_MODEL_CALLS_PER_RUN
+    return calls * per_call
