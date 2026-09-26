@@ -5,7 +5,9 @@ import langsmith
 from langsmith import Client
 from langsmith.anonymizer import create_anonymizer
 
-from chinook import catalog, config, prompts
+from chinook.assembly import prompts
+from chinook.foundation import config
+from chinook.helpers import catalog
 
 PHONE = re.compile(r"\+?\d[\d\s().-]{8,}\d")
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")

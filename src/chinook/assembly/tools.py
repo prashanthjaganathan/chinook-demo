@@ -4,8 +4,10 @@ from typing import Literal
 from langchain.tools import ToolRuntime, tool
 from pydantic import BaseModel
 
-from chinook import catalog, config, engine, refunds, store
-from chinook.context import CustomerContext
+from chinook.domain import engine, refunds
+from chinook.foundation import config
+from chinook.foundation.context import CustomerContext
+from chinook.helpers import catalog, store
 
 
 def readable(value):

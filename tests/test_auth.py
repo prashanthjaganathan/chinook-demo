@@ -1,6 +1,8 @@
 import pytest
 
-from chinook import auth, config, otp
+from chinook.domain import auth
+from chinook.foundation import config
+from chinook.helpers import otp
 
 AARON = "+1 (204) 452-6452"
 

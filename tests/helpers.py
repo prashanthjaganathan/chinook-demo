@@ -5,8 +5,8 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
-from chinook import refunds
-from chinook.context import CustomerContext
+from chinook.domain import refunds
+from chinook.foundation.context import CustomerContext
 
 
 def runtime_for(customer_id, thread="t1", call="c1", state=None):

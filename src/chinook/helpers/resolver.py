@@ -3,7 +3,7 @@
 import difflib
 import unicodedata
 
-from chinook import config
+from chinook.foundation import config
 
 
 def normalize(text) -> str:

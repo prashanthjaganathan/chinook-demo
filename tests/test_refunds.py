@@ -1,4 +1,6 @@
-from chinook import catalog, config, refunds, store
+from chinook.domain import refunds
+from chinook.foundation import config
+from chinook.helpers import catalog, store
 
 
 def labels(result):

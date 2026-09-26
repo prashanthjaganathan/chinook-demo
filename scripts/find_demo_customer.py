@@ -1,6 +1,7 @@
 """Ranks customers who can carry both demo workflows in one conversation."""
 
-from chinook import catalog, config
+from chinook.foundation import config
+from chinook.helpers import catalog
 
 MIN_OWNED, MIN_ALBUM_TRACKS = 2, 5
 

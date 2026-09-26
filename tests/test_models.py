@@ -1,6 +1,7 @@
 import pytest
 
-from chinook import config, models
+from chinook.assembly import models
+from chinook.foundation import config
 
 
 @pytest.fixture

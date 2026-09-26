@@ -10,8 +10,8 @@ import uuid
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from chinook.agents import build_supervisor
-from chinook.context import CustomerContext
+from chinook.assembly.agents import build_supervisor
+from chinook.foundation.context import CustomerContext
 
 
 def main() -> None:

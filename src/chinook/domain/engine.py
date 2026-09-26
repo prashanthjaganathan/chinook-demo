@@ -2,7 +2,8 @@
 import hashlib
 from collections import Counter
 
-from chinook import catalog, config, pricing, resolver, store
+from chinook.foundation import config
+from chinook.helpers import catalog, pricing, resolver, store
 
 MODES = ("complete_album", "by_artist", "similar_to_track", "for_me")
 

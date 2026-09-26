@@ -3,8 +3,9 @@ import os
 import pytest
 from helpers import call, once_then, tool_results
 
-from chinook import agents, config, prompts
-from chinook.context import CustomerContext
+from chinook.assembly import agents, prompts
+from chinook.foundation import config
+from chinook.foundation.context import CustomerContext
 
 live = pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="needs a real key")
 

@@ -2,7 +2,9 @@ from decimal import Decimal
 
 import pytest
 
-from chinook import catalog, config, engine, store
+from chinook.domain import engine
+from chinook.foundation import config
+from chinook.helpers import catalog, store
 
 IN_STEP = 205
 

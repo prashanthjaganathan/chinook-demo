@@ -10,7 +10,10 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.config import get_config
 from pydantic import BaseModel
 
-from chinook import auth, catalog, config, models, otp, store
+from chinook.assembly import models
+from chinook.domain import auth
+from chinook.foundation import config
+from chinook.helpers import catalog, otp, store
 
 
 def thread_id() -> str | None:

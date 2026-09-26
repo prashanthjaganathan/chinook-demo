@@ -2,7 +2,7 @@
 
 import logging
 
-from chinook import config
+from chinook.foundation import config
 
 log = logging.getLogger(__name__)
 

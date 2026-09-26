@@ -4,9 +4,10 @@ import os
 import sqlite3
 from pathlib import Path
 
-from chinook import catalog, config
+from chinook.foundation import config
+from chinook.helpers import catalog
 
-DEFAULT_PATH = Path(__file__).resolve().parents[2] / "data" / "support.sqlite"
+DEFAULT_PATH = Path(__file__).resolve().parents[3] / "data" / "support.sqlite"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS refund_requests (

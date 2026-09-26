@@ -10,10 +10,17 @@ from langchain_core.messages import AIMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from chinook import agents, config, models, store
-from chinook.context import CustomerContext
-from chinook.middleware import SessionGuard, atool_error, model_failure, tool_error
-from chinook.tools import find_purchases
+from chinook.assembly import agents, models
+from chinook.assembly.middleware import (
+    SessionGuard,
+    atool_error,
+    model_failure,
+    tool_error,
+)
+from chinook.assembly.tools import find_purchases
+from chinook.foundation import config
+from chinook.foundation.context import CustomerContext
+from chinook.helpers import store
 
 
 class Request:
@@ -69,7 +76,7 @@ def test_error_messages_leak_no_internals():
 
 
 def test_a_failing_tool_reaches_the_model_marked_as_an_error(monkeypatch):
-    monkeypatch.setattr("chinook.catalog.customer_purchases",
+    monkeypatch.setattr("chinook.helpers.catalog.customer_purchases",
                         lambda *a: (_ for _ in ()).throw(sqlite3.OperationalError("locked")))
     result = agents.build_subagent(agents.spec_named("invoice_support"),
                                    model=once_then(call("find_purchases"))).invoke(

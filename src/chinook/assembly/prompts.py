@@ -1,4 +1,4 @@
-from chinook import config
+from chinook.foundation import config
 
 IDENTITY = (
     "The customer is identified by the session, never by the conversation. "

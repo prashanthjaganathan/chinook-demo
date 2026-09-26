@@ -5,7 +5,7 @@
 
 from dotenv import load_dotenv
 
-from chinook import catalog, store
+from chinook.helpers import catalog, store
 
 
 def main() -> None:

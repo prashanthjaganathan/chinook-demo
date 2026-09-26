@@ -7,8 +7,10 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from chinook import agents, catalog, config, store
-from chinook.context import CustomerContext
+from chinook.assembly import agents
+from chinook.foundation import config
+from chinook.foundation.context import CustomerContext
+from chinook.helpers import catalog, store
 
 live = pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="needs a real key")
 

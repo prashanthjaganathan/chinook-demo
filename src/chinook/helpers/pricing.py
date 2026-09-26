@@ -1,6 +1,6 @@
 from decimal import ROUND_HALF_UP, Decimal
 
-from chinook.config import COMPLETION_DISCOUNT
+from chinook.foundation.config import COMPLETION_DISCOUNT
 
 CENT = Decimal("0.01")
 

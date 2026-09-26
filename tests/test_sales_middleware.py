@@ -2,8 +2,8 @@ from types import SimpleNamespace
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from chinook import config
-from chinook.middleware import MustUseATool, PriceGuard
+from chinook.assembly.middleware import MustUseATool, PriceGuard
+from chinook.foundation import config
 
 OFFER = ToolMessage('{"final_price": "4.75", "list_price": "5.94"}', tool_call_id="c1")
 

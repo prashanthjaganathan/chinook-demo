@@ -2,11 +2,17 @@ from decimal import Decimal
 
 from helpers import runtime_for
 
-from chinook import catalog, config, pricing, store
-from chinook.tools import (
-    buy_completion, describe_purchase, find_purchases, readable, recommend_engine, request_refund,
+from chinook.assembly.tools import (
+    buy_completion,
+    describe_purchase,
+    find_purchases,
+    readable,
+    recommend_engine,
+    request_refund,
     search_catalog,
 )
+from chinook.foundation import config
+from chinook.helpers import catalog, pricing, store
 
 TOOLS = (find_purchases, search_catalog, recommend_engine, buy_completion, request_refund)
 

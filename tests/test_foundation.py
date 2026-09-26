@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from chinook import catalog, config
+from chinook.foundation import config
+from chinook.helpers import catalog
 
 SOURCE = Path(__file__).resolve().parents[1] / "src" / "chinook"
 SQL_STARTS = ("SELECT", "INSERT", "UPDATE", "DELETE", "WITH", "CREATE", "DROP", "WHERE", "AND ")

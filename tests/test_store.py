@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from chinook import catalog, store
+from chinook.helpers import catalog, store
 
 
 def a_request(**overrides):

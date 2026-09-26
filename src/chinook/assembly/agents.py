@@ -3,21 +3,36 @@ from dataclasses import dataclass
 from dotenv import load_dotenv
 from langchain.agents import create_agent
 from langchain.agents.middleware import (
-    HumanInTheLoopMiddleware, ModelCallLimitMiddleware, ModelFallbackMiddleware,
-    ModelRetryMiddleware, ToolCallLimitMiddleware, ToolErrorMiddleware,
+    HumanInTheLoopMiddleware,
+    ModelCallLimitMiddleware,
+    ModelFallbackMiddleware,
+    ModelRetryMiddleware,
+    ToolCallLimitMiddleware,
+    ToolErrorMiddleware,
 )
 from langchain.tools import ToolRuntime, tool
 from langchain_core.messages import AIMessage, HumanMessage
 
-from chinook import config, models, observability, prompts, tools
-from chinook.context import CustomerContext
-from chinook.middleware import (
-    AuthMiddleware, MustUseATool, PriceGuard, SessionGuard, atool_error, model_failure, tool_error,
+from chinook.assembly import models, observability, prompts, tools
+from chinook.assembly.middleware import (
+    AuthMiddleware,
+    MustUseATool,
+    PriceGuard,
+    SessionGuard,
+    atool_error,
+    model_failure,
+    tool_error,
 )
-from chinook.tools import (
-    buy_completion, find_purchases, recommend_engine, request_refund, resolve_customer,
+from chinook.assembly.tools import (
+    buy_completion,
+    find_purchases,
+    recommend_engine,
+    request_refund,
+    resolve_customer,
     search_catalog,
 )
+from chinook.foundation import config
+from chinook.foundation.context import CustomerContext
 
 load_dotenv()
 observability.enable_masking()

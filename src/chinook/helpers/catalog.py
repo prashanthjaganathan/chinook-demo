@@ -3,9 +3,9 @@ import sqlite3
 from decimal import Decimal
 from pathlib import Path
 
-from chinook import config
+from chinook.foundation import config
 
-DB_PATH = Path(__file__).resolve().parents[2] / "data" / "chinook.db"
+DB_PATH = Path(__file__).resolve().parents[3] / "data" / "chinook.db"
 SQLITE_MAX_INT = 2**63 - 1
 
 

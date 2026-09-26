@@ -1,8 +1,9 @@
 import re
 from dataclasses import dataclass, field
 
-from chinook import config, otp
-from chinook.catalog import digits_only
+from chinook.foundation import config
+from chinook.helpers import otp
+from chinook.helpers.catalog import digits_only
 
 PHONE_PATTERN = re.compile(r"\+?\d[\d\s().-]{8,}\d")
 

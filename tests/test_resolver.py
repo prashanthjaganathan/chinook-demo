@@ -1,6 +1,6 @@
 import pytest
 
-from chinook import catalog, resolver
+from chinook.helpers import catalog, resolver
 
 ARTISTS = catalog.query("SELECT ArtistId AS id, Name AS name, Name AS label FROM Artist", ())
 

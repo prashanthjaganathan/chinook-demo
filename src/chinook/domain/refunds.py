@@ -1,7 +1,8 @@
 """Refund decisions from a versioned checklist. The model picks the item and reason; code decides."""
 import hashlib
 
-from chinook import catalog, config, resolver, store
+from chinook.foundation import config
+from chinook.helpers import catalog, resolver, store
 
 
 def purchase_ref(customer_id: int, invoice_line_id: int) -> str:

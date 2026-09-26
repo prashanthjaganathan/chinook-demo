@@ -6,9 +6,12 @@ from helpers import once_then, ref, refund_call, runtime_for
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from chinook import agents, catalog, config, refunds, store
-from chinook.context import CustomerContext
-from chinook.tools import RefundReason, describe_refund, request_refund
+from chinook.assembly import agents
+from chinook.assembly.tools import RefundReason, describe_refund, request_refund
+from chinook.domain import refunds
+from chinook.foundation import config
+from chinook.foundation.context import CustomerContext
+from chinook.helpers import catalog, store
 
 MP3 = 1
 

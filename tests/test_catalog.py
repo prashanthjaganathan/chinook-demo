@@ -3,7 +3,8 @@ from decimal import Decimal
 
 import pytest
 
-from chinook import catalog, config
+from chinook.foundation import config
+from chinook.helpers import catalog
 
 IN_STEP, BIGGEST_ALBUM, PROTECTED_TRACK, MP3, VIDEO_AT_99 = 205, 141, 1504, 1, 3402
 MP3_ROW = {"media_type": "MPEG audio file", "unit_price": Decimal("0.99")}

@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from chinook import catalog, pricing
+from chinook.helpers import catalog, pricing
 
 
 def test_six_tracks_at_99_cents():
