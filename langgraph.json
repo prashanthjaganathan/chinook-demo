@@ -1,0 +1,6 @@
+{
+  "$schema": "https://langgra.ph/schema.json",
+  "dependencies": ["."],
+  "graphs": { "support": "./src/chinook/agents.py:graph" },
+  "env": ".env"
+}

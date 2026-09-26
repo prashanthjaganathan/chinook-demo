@@ -3,11 +3,13 @@ from dataclasses import dataclass
 from dotenv import load_dotenv
 from langchain.agents import create_agent
 from langchain.agents.middleware import HumanInTheLoopMiddleware
+from langchain.tools import ToolRuntime, tool
 
 from chinook import models, prompts
 from chinook.context import CustomerContext
 from chinook.tools import (
-    get_invoice, get_my_library, price_completion, request_refund_or_swap, search_catalog,
+    get_invoice, get_my_library, price_completion, request_refund_or_swap, resolve_customer,
+    search_catalog,
 )
 
 load_dotenv()
@@ -67,3 +69,36 @@ def build_subagent(spec: AgentSpec, model=None, checkpointer=None):
         checkpointer=checkpointer,
         name=spec.name,
     )
+
+
+def delegate(spec: AgentSpec, subagent):
+    @tool(f"ask_{spec.name}", description=spec.description)
+    def ask(task: str, runtime: ToolRuntime[CustomerContext]) -> str:
+        result = subagent.invoke(
+            {"messages": [{"role": "user", "content": task}]},
+            context=CustomerContext(customer_id=resolve_customer(runtime)),
+        )
+        return result["messages"][-1].text
+
+    return ask
+
+
+def supervisor_middleware() -> list:
+    return []
+
+
+def build_supervisor(checkpointer=None, model=None, subagent_model=None, specs=SUBAGENTS):
+    return create_agent(
+        model=model or models.primary(),
+        tools=[delegate(spec, build_subagent(spec, model=subagent_model)) for spec in specs],
+        system_prompt=prompts.supervisor_prompt(specs),
+        middleware=supervisor_middleware(),
+        context_schema=CustomerContext,
+        checkpointer=checkpointer,
+        name="supervisor",
+    )
+
+
+def graph():
+    """Studio entrypoint. The server supplies its own checkpointer and refuses one of ours."""
+    return build_supervisor()

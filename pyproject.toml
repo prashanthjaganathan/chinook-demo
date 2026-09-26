@@ -11,7 +11,11 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8", "debugpy>=1.8"]
+dev = [
+    "pytest>=8",
+ "debugpy>=1.8",
+ "langgraph-cli[inmem]>=0.4.32",
+]
 
 [build-system]
 requires = ["hatchling"]

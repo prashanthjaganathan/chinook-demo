@@ -43,3 +43,18 @@ Only call request_refund_or_swap once the customer has clearly chosen one. A hum
 
 {PRICES}
 {IDENTITY}"""
+
+
+def supervisor_prompt(specs) -> str:
+    roster = "\n".join(f"- ask_{spec.name}: {spec.description}" for spec in specs)
+    return f"""You coordinate specialists who help customers of a digital music store.
+
+{roster}
+
+List every request in the customer's message. Handle each one with the right specialist, one at a \
+time, and do not stop after the first. Pass the customer's own words as the task. If a request fits \
+no specialist, say what you can help with instead. Then reply once, combining what the specialists \
+said. If a specialist says a request is waiting for review, say it has been sent for review.
+
+{PRICES}
+{IDENTITY}"""

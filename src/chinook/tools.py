@@ -20,6 +20,11 @@ def customer_of(runtime: ToolRuntime[CustomerContext]) -> int | None:
     return getattr(runtime.context, "customer_id", None)
 
 
+def resolve_customer(runtime: ToolRuntime[CustomerContext]) -> int | None:
+    # Context is fixed when a run starts, so a login finished mid-thread lives in state.
+    return customer_of(runtime) or (runtime.state or {}).get("verified_customer_id")
+
+
 @tool
 def get_my_library(runtime: ToolRuntime[CustomerContext]) -> list[dict] | dict:
     """List the tracks this customer already owns, with album, artist, genre, format, and price."""
