@@ -1,7 +1,7 @@
 """Refund decisions from a versioned checklist. The model picks the item and reason; code decides."""
 import hashlib
 
-from chinook import catalog, config, resolver
+from chinook import catalog, config, resolver, store
 
 
 def purchase_ref(customer_id: int, invoice_line_id: int) -> str:
@@ -48,3 +48,31 @@ def purchase_for_ref(customer_id: int, ref: str) -> dict | None:
     line = next((l for l in catalog.customer_purchases(customer_id)
                  if str(l["invoice_line_id"]) == line_id), None)
     return line if line and purchase_ref(customer_id, line["invoice_line_id"]) == ref else None
+
+
+def checklist(customer_id: int, line: dict, reason: str, device, recent: int) -> dict:
+    locked = not config.plays_anywhere(line["media_type"])
+    bought = [l for l in catalog.customer_purchases(customer_id) if l["track_id"] == line["track_id"]]
+    return {
+        "reason_is_refundable": reason in config.REFUNDABLE_REASONS,
+        # Protected files play on Apple devices, so only a non-Apple device explains the problem.
+        "data_supports_reason": (reason == "wont_play" and locked and device != "apple")
+                                or (reason == "bought_by_mistake" and len(bought) > 1),
+        "first_refund_recently": recent == 0,
+        "within_auto_limit": line["unit_price"] <= config.AUTO_REFUND_LIMIT,
+    }
+
+
+def decide(customer_id: int, line: dict, reason: str, device=None) -> dict:
+    recent = store.recent_refunds(customer_id)
+    items = checklist(customer_id, line, reason, device, recent)
+    score = sum(config.REFUND_CHECKLIST[name] for name, passed in items.items() if passed)
+    low, high = config.REFUND_BANDS
+    escalate = reason == "other" or recent >= config.MAX_RECENT_REFUNDS
+    if escalate or low <= score < high:
+        status = "needs_review"
+    elif score >= high:
+        status = "auto_approved"
+    else:
+        status = "auto_rejected"
+    return {"status": status, "score": score, "items": items, "policy": config.REFUND_POLICY_VERSION}

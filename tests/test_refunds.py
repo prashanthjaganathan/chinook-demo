@@ -1,4 +1,4 @@
-from chinook import catalog, config, refunds
+from chinook import catalog, config, refunds, store
 
 
 def labels(result):
@@ -58,3 +58,67 @@ def test_a_ref_resolves_only_for_its_own_customer_and_unedited():
     assert refunds.purchase_for_ref(54, f"{line_id}-0000000000") is None
     assert refunds.purchase_for_ref(54, line_id) is None
     assert refunds.purchase_for_ref(54, "junk") is None
+
+
+def line(customer_id, track):
+    return next(l for l in catalog.customer_purchases(customer_id) if l["track"] == track)
+
+
+def outcome(reason, track="Midnight", device="other", customer_id=54):
+    decision = refunds.decide(customer_id, line(customer_id, track), reason, device)
+    return decision["score"], decision["status"]
+
+
+def approve_refunds(count):
+    for n in range(count):
+        store.record(f"k{n}", customer_id=54, invoice_line_id=n + 1, track_id=1, action="refund",
+                     replacement_track_id=None, amount="0.99", reason="wont_play",
+                     status="approved", score=100, policy="v1")
+
+
+def test_protected_file_on_android_first_refund_is_auto_approved():
+    assert outcome("wont_play") == (100, "auto_approved")
+
+
+def test_an_mp3_that_wont_play_goes_to_staff():
+    assert outcome("wont_play", track="Someday Never Comes") == (65, "needs_review")
+
+
+def test_a_protected_file_on_apple_is_not_explained_by_the_format():
+    assert outcome("wont_play", device="apple") == (65, "needs_review")
+
+
+def test_buying_the_same_track_twice_is_auto_approved(monkeypatch):
+    twice = catalog.customer_purchases(54) + [line(54, "Midnight")]
+    monkeypatch.setattr(catalog, "customer_purchases", lambda customer_id: twice)
+
+    assert outcome("bought_by_mistake") == (100, "auto_approved")
+
+
+def test_bought_by_mistake_without_a_duplicate_goes_to_staff():
+    assert outcome("bought_by_mistake") == (65, "needs_review")
+
+
+def test_didnt_like_it_and_no_reason_are_auto_rejected():
+    assert outcome("didnt_like_it") == (35, "auto_rejected")
+    assert outcome("not_given") == (35, "auto_rejected")
+
+
+def test_other_always_goes_to_staff():
+    assert outcome("other")[1] == "needs_review"
+
+
+def test_one_recent_refund_costs_points_and_three_escalate():
+    approve_refunds(1)
+    assert outcome("wont_play") == (80, "auto_approved")
+
+    approve_refunds(3)
+    assert outcome("wont_play") == (80, "needs_review")
+
+
+def test_the_decision_records_its_checks_and_policy_version():
+    decision = refunds.decide(54, line(54, "Midnight"), "didnt_like_it", "other")
+
+    assert decision["policy"] == config.REFUND_POLICY_VERSION
+    assert set(decision["items"]) == set(config.REFUND_CHECKLIST)
+    assert decision["items"]["reason_is_refundable"] is False
