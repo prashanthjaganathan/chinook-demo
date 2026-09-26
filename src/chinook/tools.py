@@ -4,7 +4,7 @@ from typing import Literal
 from langchain.tools import ToolRuntime, tool
 from pydantic import BaseModel
 
-from chinook import catalog, config, engine, store
+from chinook import catalog, config, engine, refunds, store
 from chinook.context import CustomerContext
 
 
@@ -25,30 +25,6 @@ def customer_of(runtime: ToolRuntime[CustomerContext]) -> int | None:
 def resolve_customer(runtime: ToolRuntime[CustomerContext]) -> int | None:
     # Context is fixed when a run starts, so a login finished mid-thread lives in state.
     return customer_of(runtime) or (runtime.state or {}).get("verified_customer_id")
-
-
-@tool
-def get_my_library(runtime: ToolRuntime[CustomerContext]) -> list[dict] | dict:
-    """List the tracks this customer already owns, with album, artist, genre, format, and price."""
-    customer_id = customer_of(runtime)
-    if customer_id is None:
-        return {"error": config.NO_IDENTITY}
-    return readable(catalog.get_library(customer_id))
-
-
-@tool
-def get_invoice(runtime: ToolRuntime[CustomerContext], invoice_id: int | None = None) -> dict:
-    """Read one of this customer's past purchases, newest by default.
-
-    Returns the date, total, and each line with the price paid and the file format.
-    """
-    customer_id = customer_of(runtime)
-    if customer_id is None:
-        return {"error": config.NO_IDENTITY}
-    invoice_id = invoice_id or catalog.latest_invoice_id(customer_id)
-    if invoice_id is None:
-        return {"error": config.NO_PURCHASES}
-    return readable(catalog.get_invoice(customer_id, invoice_id))
 
 
 @tool
@@ -128,54 +104,89 @@ def describe_purchase(tool_call, state, runtime) -> str:
     return f"Buy {len(offer['missing_tracks'])} tracks on {offer['album']} for ${offer['final_price']}?"
 
 
-APPROVAL_TEXT = {"buy_completion": describe_purchase}
+RefundReason = Literal["wont_play", "bought_by_mistake", "didnt_like_it", "other", "not_given"]
+Device = Literal["apple", "other"]
 
 
 @tool
-def request_refund_or_swap(
+def find_purchases(
     runtime: ToolRuntime[CustomerContext],
-    track_id: int,
-    action: str,
-    reason: str,
-    replacement_track_id: int | None = None,
+    track: str | None = None,
+    artist: str | None = None,
+    wont_play_on: Device | None = None,
+    latest: bool = False,
 ) -> dict:
-    """Raise a refund or a replacement for a track this customer bought.
+    """Find which of this customer's purchases they mean, from whatever they said about it.
 
-    action is "refund" or "swap"; a swap needs replacement_track_id. The amount comes from the
-    original purchase. A human reviews this before anything is recorded.
+    Returns candidates, each with a purchase_ref, and the reason options to ask about.
     """
     customer_id = customer_of(runtime)
     if customer_id is None:
         return {"error": config.NO_IDENTITY}
-    if action not in config.REFUND_ACTIONS:
-        return {"error": "action must be refund or swap."}
-    if not reason or not reason.strip() or len(reason) > config.MAX_REASON:
-        return {"error": f"reason must be 1 to {config.MAX_REASON} characters."}
+    return readable(refunds.find(customer_id, track, artist, wont_play_on, latest))
+
+
+@tool
+def request_refund(
+    runtime: ToolRuntime[CustomerContext],
+    purchase_ref: str,
+    reason: RefundReason,
+    action: Literal["refund", "swap"] = "refund",
+    replacement_track_id: int | None = None,
+    device: Device | None = None,
+    details: str | None = None,
+) -> dict:
+    """Refund or swap one purchase, by the purchase_ref from find_purchases.
+
+    The customer confirms first. The store's refund policy decides the outcome.
+    """
+    customer_id = customer_of(runtime)
+    if customer_id is None:
+        return {"error": config.NO_IDENTITY}
+    line = refunds.purchase_for_ref(customer_id, purchase_ref)
+    if line is None:
+        return {"error": config.NOT_YOUR_PURCHASE}
+    if details and len(details) > config.MAX_REASON:
+        return {"error": f"details must be at most {config.MAX_REASON} characters."}
     if (action == "swap") != (replacement_track_id is not None):
         return {"error": "a swap needs a replacement track, and a refund cannot name one."}
+    if store.has_live_request(line["invoice_line_id"]):
+        return {"error": config.ALREADY_REQUESTED}
 
-    purchase = catalog.purchase_of(customer_id, track_id)
-    if purchase is None:
-        return {"error": config.NOT_YOUR_PURCHASE}
     if action == "swap":
-        problem = catalog.check_swap(customer_id, track_id, replacement_track_id)
+        problem = catalog.check_swap(customer_id, line["track_id"], replacement_track_id)
         if problem:
             return {"error": problem}
+        # A valid swap moves no money, so it is approved without scoring.
+        decision = {"status": "auto_approved", "score": None, "items": {}, "policy": config.REFUND_POLICY_VERSION}
+    else:
+        decision = refunds.decide(customer_id, line, reason, device)
 
     thread_id = (runtime.config or {}).get("configurable", {}).get("thread_id", "")
     try:
-        recorded = store.record(
+        store.record(
             store.request_key(str(thread_id), str(runtime.tool_call_id)),
-            customer_id=customer_id,
-            invoice_line_id=purchase["invoice_line_id"],
-            track_id=track_id,
-            action=action,
-            replacement_track_id=replacement_track_id,
-            amount=str(purchase["unit_price"]),
-            reason=reason.strip(),
-            status="needs_review", score=None, policy=config.REFUND_POLICY_VERSION,
-        )
+            customer_id=customer_id, invoice_line_id=line["invoice_line_id"], track_id=line["track_id"],
+            action=action, replacement_track_id=replacement_track_id, amount=str(line["unit_price"]),
+            reason=reason if not details else f"{reason}: {details.strip()}",
+            status=decision["status"], score=decision["score"], policy=decision["policy"])
     except Exception:
         return {"error": config.REQUEST_NOT_DONE}
-    return {"status": recorded["status"], "action": action, "track": purchase["track"],
-            "amount": recorded["amount"]}
+    message = config.SWAP_APPROVED if action == "swap" else config.REFUND_MESSAGES[decision["status"]]
+    return {"status": decision["status"], "action": action, "track": line["track"],
+            "amount": str(line["unit_price"]), "message": message,
+            "failed_checks": [name for name, passed in decision["items"].items() if not passed]}
+
+
+def describe_refund(tool_call, state, runtime) -> str:
+    """The confirmation the customer sees: the exact item, price, and reason."""
+    args, customer_id = tool_call["args"], customer_of(runtime)
+    line = refunds.purchase_for_ref(customer_id, args.get("purchase_ref", "")) if customer_id else None
+    if line is None:
+        return "This purchase could not be found on your account."
+    verb = "Swap" if args.get("action") == "swap" else "Refund"
+    why = config.REFUND_REASON_LABELS.get(args.get("reason"), "no reason given")
+    return f"{verb} {line['track']} (${line['unit_price']}, bought {line['invoice_date']}) because {why}?"
+
+
+APPROVAL_TEXT = {"buy_completion": describe_purchase, "request_refund": describe_refund}

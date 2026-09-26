@@ -2,22 +2,22 @@ import json
 import os
 
 import pytest
-from helpers import FakeModel, call, once_then, tool_results
+from helpers import FakeModel, call, once_then, refund_call, tool_results
 from langchain_core.messages import AIMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from chinook import agents, catalog, prompts, store
+from chinook import agents, prompts, store
 from chinook.context import CustomerContext
 
-REFUND = call("request_refund_or_swap", {"track_id": 1504, "action": "refund", "reason": "will not play"})
+REFUND = refund_call()
 
 
 def first_track_answer(messages):
     results = tool_results(messages)
     if not results:
-        return call("get_my_library")
-    return AIMessage(str(json.loads(results[0].content)[0]["track_id"]))
+        return call("find_purchases", {"track": "midnight"})
+    return AIMessage(json.loads(results[0].content)["purchases"][0]["label"])
 
 
 def supervisor(sup_model, sub_model, checkpointer=None, specs=agents.SUBAGENTS):
@@ -39,7 +39,7 @@ def test_the_subagent_receives_the_parents_customer_and_returns_its_answer():
     result = graph.invoke({"messages": [{"role": "user", "content": "hi"}]},
                           context=CustomerContext(customer_id=54))
 
-    assert tool_results(result["messages"])[0].content == str(catalog.get_library(54)[0]["track_id"])
+    assert tool_results(result["messages"])[0].content.startswith("Midnight by ")
     assert result["messages"][-1].text == "relayed"
 
 
@@ -77,7 +77,7 @@ def test_a_subagent_approval_pauses_at_the_top_level():
     _, _, result = approval_run()
 
     assert "__interrupt__" in result
-    assert result["__interrupt__"][0].value["action_requests"][0]["name"] == "request_refund_or_swap"
+    assert result["__interrupt__"][0].value["action_requests"][0]["name"] == "request_refund"
     assert store.open_requests(54) == []
 
 

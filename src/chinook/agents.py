@@ -15,7 +15,7 @@ from chinook.middleware import (
     AuthMiddleware, MustUseATool, PriceGuard, SessionGuard, atool_error, model_failure, tool_error,
 )
 from chinook.tools import (
-    buy_completion, get_invoice, get_my_library, recommend_engine, request_refund_or_swap, resolve_customer,
+    buy_completion, find_purchases, recommend_engine, request_refund, resolve_customer,
     search_catalog,
 )
 
@@ -44,10 +44,10 @@ SUBAGENTS = (
     ),
     AgentSpec(
         "invoice_support",
-        "Handles purchases that will not play: diagnoses the format, offers a refund or a swap.",
+        "Handles refunds and replacements, including purchases that will not play.",
         prompts.INVOICE_SUPPORT_PROMPT,
-        (get_my_library, get_invoice, search_catalog, request_refund_or_swap),
-        approvals=("request_refund_or_swap",),
+        (find_purchases, search_catalog, request_refund),
+        approvals=("request_refund",),
     ),
 )
 

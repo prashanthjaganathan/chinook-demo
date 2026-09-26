@@ -22,7 +22,7 @@ def test_the_registry_names_both_specialists():
 def test_music_recommendation_uses_the_engine_but_not_invoices():
     names = {t.name for t in agents.spec_named("music_recommendation").tools}
 
-    assert "recommend_engine" in names and "get_invoice" not in names
+    assert "recommend_engine" in names and "request_refund" not in names
 
 
 def test_a_subagent_runs_its_tools_with_the_given_customer():

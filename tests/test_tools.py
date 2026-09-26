@@ -4,11 +4,11 @@ from helpers import runtime_for
 
 from chinook import catalog, config, pricing, store
 from chinook.tools import (
-    buy_completion, describe_purchase, get_invoice, get_my_library, readable, recommend_engine,
+    buy_completion, describe_purchase, find_purchases, readable, recommend_engine, request_refund,
     search_catalog,
 )
 
-TOOLS = (get_my_library, get_invoice, search_catalog, recommend_engine, buy_completion)
+TOOLS = (find_purchases, search_catalog, recommend_engine, buy_completion, request_refund)
 
 
 def run(tool, customer_id, **args):
@@ -22,23 +22,15 @@ def test_no_tool_accepts_customer_id():
 
 
 def test_tools_read_the_customer_from_context():
-    mine = {r["track_id"] for r in run(get_my_library, 54)}
-
-    assert mine == {r["track_id"] for r in catalog.get_library(54)}
-    assert mine != {r["track_id"] for r in run(get_my_library, 1)}
+    assert run(find_purchases, 54, track="midnight")["status"] == "found"
+    assert run(find_purchases, 1, track="midnight")["status"] == "not_found"
 
 
 def test_missing_context_gets_the_fixed_no_identity_result():
-    assert run(get_my_library, None) == {"error": config.NO_IDENTITY}
-    assert run(get_invoice, None) == {"error": config.NO_IDENTITY}
+    assert run(find_purchases, None) == {"error": config.NO_IDENTITY}
+    assert run(request_refund, None, purchase_ref="x", reason="other") == {"error": config.NO_IDENTITY}
     assert run(recommend_engine, None, mode="for_me") == {"error": config.NO_IDENTITY}
     assert run(buy_completion, None, offer_id="x") == {"error": config.NO_IDENTITY}
-
-
-def test_invoice_tool_hides_foreign_invoices_and_defaults_to_latest():
-    assert run(get_invoice, 1, invoice_id=293) == run(get_invoice, 1, invoice_id=999999)
-    assert run(get_invoice, 1)["invoice_id"] == 382
-    assert run(get_invoice, 999999) == {"error": config.NO_PURCHASES}
 
 
 def test_exclude_owned_uses_the_session_customer():
@@ -50,7 +42,7 @@ def test_exclude_owned_uses_the_session_customer():
 def test_prices_reach_the_model_as_exact_strings():
     assert readable({"total": Decimal("8.91"), "lines": [{"unit_price": Decimal("0.99")}]}) == {
         "total": "8.91", "lines": [{"unit_price": "0.99"}]}
-    assert all(r["unit_price"] == "0.99" for r in run(get_my_library, 54))
+    assert "$0.99" in run(find_purchases, 54, track="midnight")["purchases"][0]["label"]
 
 
 def in_step_offer():

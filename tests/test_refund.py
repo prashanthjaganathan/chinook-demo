@@ -1,54 +1,83 @@
-from concurrent.futures import ThreadPoolExecutor
+from typing import get_args
 
 import pytest
-from helpers import call, once_then, runtime_for
+from helpers import once_then, ref, refund_call, runtime_for
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from chinook import agents, catalog, config, store
+from chinook import agents, catalog, config, refunds, store
 from chinook.context import CustomerContext
-from chinook.tools import request_refund_or_swap
+from chinook.tools import RefundReason, describe_refund, request_refund
 
-PROTECTED, MP3 = 1504, 1
+MP3 = 1
 
 
 def ask(customer_id=54, thread="t1", call_id="c1", **args):
-    payload = {"track_id": PROTECTED, "action": "refund", "reason": "will not play", **args}
-    return request_refund_or_swap.invoke({"runtime": runtime_for(customer_id, thread, call_id), **payload})
+    payload = {"purchase_ref": ref(), "reason": "wont_play", "device": "other", **args}
+    return request_refund.invoke({"runtime": runtime_for(customer_id, thread, call_id), **payload})
+
+
+def test_the_reason_codes_match_the_policy():
+    assert get_args(RefundReason) == tuple(config.REFUND_REASON_LABELS)
 
 
 def test_the_amount_comes_from_the_invoice_line_not_the_model():
-    assert ask()["amount"] == str(catalog.purchase_of(54, PROTECTED)["unit_price"])
-    assert "amount" not in request_refund_or_swap.tool_call_schema.model_fields
+    line = refunds.purchase_for_ref(54, ref())
+
+    assert ask()["amount"] == str(line["unit_price"])
+    assert "amount" not in request_refund.tool_call_schema.model_fields
 
 
-def test_a_foreign_purchase_is_refused_and_nothing_is_recorded():
-    assert ask(customer_id=1) == ask(customer_id=1, track_id=3503) == {"error": config.NOT_YOUR_PURCHASE}
-    assert store.open_requests(1) == []
+def test_the_policy_decides_and_says_what_happened():
+    result = ask()
+
+    assert result["status"] == "auto_approved" and result["message"] == config.REFUND_MESSAGES["auto_approved"]
+    assert store.open_requests(54)[0]["score"] == 100
+
+
+def test_a_rejection_lists_the_failed_checks_and_an_appeal_goes_to_staff():
+    rejected = ask(reason="didnt_like_it")
+    appeal = ask(reason="other", details="appeal", call_id="c2")
+
+    assert rejected["status"] == "auto_rejected"
+    assert rejected["failed_checks"] == ["reason_is_refundable", "data_supports_reason"]
+    assert appeal["status"] == "needs_review"
+
+
+def test_a_foreign_or_made_up_ref_is_refused_and_nothing_is_recorded():
+    assert ask(customer_id=1) == ask(purchase_ref="1-0000000000") == {"error": config.NOT_YOUR_PURCHASE}
+    assert store.open_requests(1) == store.open_requests(54) == []
 
 
 @pytest.mark.parametrize("args", [
-    {"action": "delete"}, {"reason": ""}, {"reason": "x" * 501},
-    {"action": "swap"}, {"action": "refund", "replacement_track_id": MP3},
+    {"details": "x" * 501}, {"action": "swap"}, {"action": "refund", "replacement_track_id": MP3},
 ])
 def test_invalid_requests_are_refused_and_nothing_is_recorded(args):
     assert "error" in ask(**args)
     assert store.open_requests(54) == []
 
 
-def test_a_valid_swap_is_recorded_and_an_invalid_one_is_not():
+def test_a_swap_is_approved_only_when_the_swap_rules_pass():
     protected = catalog.search_catalog(media_type="Protected AAC", exclude_owned_for=54, limit=1)[0]
 
     assert "error" in ask(action="swap", replacement_track_id=protected["track_id"])
-    assert ask(action="swap", replacement_track_id=MP3)["status"] == "needs_review"
+    swapped = ask(action="swap", replacement_track_id=MP3)
+    assert (swapped["status"], swapped["message"]) == ("auto_approved", config.SWAP_APPROVED)
 
 
-def test_two_parallel_refunds_for_one_line_write_once():
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        results = list(pool.map(lambda n: ask(thread=f"t{n}", call_id=f"c{n}"), (1, 2)))
+def test_a_second_request_on_the_same_purchase_is_told_it_is_in_progress():
+    ask()
+
+    assert ask(call_id="c2") == {"error": config.ALREADY_REQUESTED}
+    assert ask(call_id="c3", action="swap", replacement_track_id=MP3) == {"error": config.ALREADY_REQUESTED}
+    assert len(store.open_requests(54)) == 1
+
+
+def test_a_replayed_call_records_once():
+    ask(reason="didnt_like_it")
+    ask(reason="didnt_like_it")
 
     assert len(store.open_requests(54)) == 1
-    assert sum("error" in r for r in results) == 1
 
 
 def test_a_store_failure_is_reported_as_not_done(monkeypatch):
@@ -57,10 +86,17 @@ def test_a_store_failure_is_reported_as_not_done(monkeypatch):
     assert ask() == {"error": config.REQUEST_NOT_DONE}
 
 
+def test_the_confirmation_names_the_item_price_and_reason():
+    tool_call = {"args": {"purchase_ref": ref(), "reason": "wont_play"}}
+    date = refunds.purchase_for_ref(54, ref())["invoice_date"]
+
+    assert describe_refund(tool_call, {}, runtime_for(54)) == (
+        f"Refund Midnight ($0.99, bought {date}) because it won't play on my device?")
+    assert describe_refund(tool_call, {}, runtime_for(1)) == "This purchase could not be found on your account."
+
+
 def approval_agent():
-    model = once_then(call("request_refund_or_swap",
-                           {"track_id": PROTECTED, "action": "refund", "reason": "will not play"}))
-    return agents.build_subagent(agents.spec_named("invoice_support"), model=model,
+    return agents.build_subagent(agents.spec_named("invoice_support"), model=once_then(refund_call()),
                                  checkpointer=InMemorySaver())
 
 
@@ -84,18 +120,18 @@ def test_the_write_pauses_for_approval_before_anything_is_recorded():
 def test_approve_writes_one_request_and_reject_writes_none():
     agent = approval_agent()
     _, config_ = start(agent)
-    resume(agent, config_, {"decisions": [{"type": "approve"}]})
-    assert len(store.open_requests(54)) == 1
+    resume(agent, config_, {"decisions": [{"type": "reject"}]})
+    assert store.open_requests(54) == []
 
     other = approval_agent()
     _, config_ = start(other)
-    resume(other, config_, {"decisions": [{"type": "reject"}]})
+    resume(other, config_, {"decisions": [{"type": "approve"}]})
     assert len(store.open_requests(54)) == 1
 
 
 def test_approval_allows_only_approve_and_reject():
     hitl = agents.approval(agents.spec_named("invoice_support"))[0]
-    allowed = hitl.interrupt_on["request_refund_or_swap"]
+    allowed = hitl.interrupt_on["request_refund"]
 
     assert set(allowed["allowed_decisions"] if isinstance(allowed, dict) else allowed.allowed_decisions) == {
         "approve", "reject"}

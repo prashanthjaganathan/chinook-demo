@@ -106,47 +106,6 @@ WHERE NOT EXISTS (
 ORDER BY t.TrackId
 """
 
-# One invoice header, only when it belongs to this customer.
-INVOICE_SQL = """
-SELECT InvoiceId AS invoice_id, date(InvoiceDate) AS invoice_date, Total AS total
-FROM Invoice
-WHERE CustomerId = ? AND InvoiceId = ?
-"""
-
-# Lines on one invoice, priced at what the customer paid.
-INVOICE_LINES_SQL = """
-SELECT il.InvoiceLineId AS invoice_line_id, il.TrackId AS track_id, t.Name AS track,
-       ar.Name AS artist, m.Name AS media_type, il.UnitPrice AS unit_price, il.Quantity AS quantity
-FROM InvoiceLine il
-JOIN Track t ON t.TrackId = il.TrackId
-JOIN Album al ON al.AlbumId = t.AlbumId
-JOIN Artist ar ON ar.ArtistId = al.ArtistId
-JOIN MediaType m ON m.MediaTypeId = t.MediaTypeId
-WHERE il.InvoiceId = ?
-ORDER BY il.InvoiceLineId
-"""
-
-# The customer's newest invoice id.
-LATEST_INVOICE_SQL = """
-SELECT InvoiceId AS invoice_id FROM Invoice
-WHERE CustomerId = ?
-ORDER BY InvoiceDate DESC, InvoiceId DESC
-LIMIT 1
-"""
-
-# The customer's most recent purchase of one track, with what they paid.
-PURCHASE_SQL = """
-SELECT il.InvoiceLineId AS invoice_line_id, il.InvoiceId AS invoice_id, il.TrackId AS track_id,
-       t.Name AS track, m.Name AS media_type, il.UnitPrice AS unit_price
-FROM Invoice i
-JOIN InvoiceLine il ON il.InvoiceId = i.InvoiceId
-JOIN Track t ON t.TrackId = il.TrackId
-JOIN MediaType m ON m.MediaTypeId = t.MediaTypeId
-WHERE i.CustomerId = :customer_id AND il.TrackId = :track_id
-ORDER BY i.InvoiceDate DESC, il.InvoiceLineId DESC
-LIMIT 1
-"""
-
 # Every line this customer bought, newest first.
 PURCHASES_SQL = """
 SELECT il.InvoiceLineId AS invoice_line_id, il.InvoiceId AS invoice_id,
@@ -256,32 +215,6 @@ def partial_albums(customer_id: int) -> list[dict]:
 def missing_tracks(customer_id: int, album_id: int) -> list[dict]:
     params = (valid_id(customer_id, "customer_id"), valid_id(album_id, "album_id"))
     return with_money(query(MISSING_TRACKS_SQL, params))
-
-
-def get_invoice(customer_id: int, invoice_id: int) -> dict:
-    params = (valid_id(customer_id, "customer_id"), valid_id(invoice_id, "invoice_id"))
-    header = query(INVOICE_SQL, params)
-    # Lines are only read after ownership is proven; foreign and missing look the same.
-    if not header:
-        return {"error": config.INVOICE_NOT_FOUND}
-    invoice = header[0]
-    invoice["total"] = money(invoice["total"])
-    invoice["lines"] = with_money(query(INVOICE_LINES_SQL, (invoice_id,)))
-    return invoice
-
-
-def latest_invoice_id(customer_id: int) -> int | None:
-    rows = query(LATEST_INVOICE_SQL, (valid_id(customer_id, "customer_id"),))
-    return rows[0]["invoice_id"] if rows else None
-
-
-def purchase_of(customer_id: int, track_id: int) -> dict | None:
-    params = {
-        "customer_id": valid_id(customer_id, "customer_id"),
-        "track_id": valid_id(track_id, "track_id"),
-    }
-    rows = with_money(query(PURCHASE_SQL, params))
-    return rows[0] if rows else None
 
 
 @functools.lru_cache

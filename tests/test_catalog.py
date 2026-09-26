@@ -84,32 +84,6 @@ def test_the_57_track_album_is_complete():
     assert len(catalog.missing_tracks(44, BIGGEST_ALBUM)) == 57 - 5
 
 
-def test_own_invoice_total_matches():
-    invoice = catalog.get_invoice(1, 382)
-
-    assert (invoice["total"], len(invoice["lines"]), invoice["invoice_date"]) == (
-        Decimal("8.91"), 9, "2025-08-07")
-
-
-def test_lines_sum_to_total_on_every_invoice(chinook_db):
-    for customer_id, invoice_id in sql(chinook_db, "SELECT CustomerId, InvoiceId FROM Invoice"):
-        invoice = catalog.get_invoice(customer_id, invoice_id)
-        assert sum((l["unit_price"] * l["quantity"] for l in invoice["lines"]), Decimal(0)) == invoice["total"]
-
-
-def test_foreign_invoice_looks_identical_to_missing_invoice():
-    assert catalog.get_invoice(1, 293) == catalog.get_invoice(1, 999999) == {
-        "error": config.INVOICE_NOT_FOUND}
-    assert "293" not in str(catalog.get_invoice(1, 293))
-
-
-def test_latest_invoice_and_purchase_lookup():
-    assert catalog.latest_invoice_id(1) == 382
-    assert catalog.latest_invoice_id(999999) is None
-    assert catalog.purchase_of(54, PROTECTED_TRACK)["unit_price"] == Decimal("0.99")
-    assert catalog.purchase_of(1, PROTECTED_TRACK) is None
-
-
 def test_artist_search_finds_all_acdc_tracks():
     assert len(catalog.search_catalog(artist="AC/DC", limit=50)) == 18
 

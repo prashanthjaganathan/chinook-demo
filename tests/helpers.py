@@ -5,6 +5,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
+from chinook import refunds
 from chinook.context import CustomerContext
 
 
@@ -17,6 +18,14 @@ def runtime_for(customer_id, thread="t1", call="c1", state=None):
         tool_call_id=call,
         store=None,
     )
+
+
+def ref(customer_id=54, track="midnight"):
+    return refunds.find(customer_id, track=track)["purchases"][0]["purchase_ref"]
+
+
+def refund_call(reason="wont_play", **args):
+    return call("request_refund", {"purchase_ref": ref(), "reason": reason, "device": "other", **args})
 
 
 def call(name, args=None, call_id="call-1"):

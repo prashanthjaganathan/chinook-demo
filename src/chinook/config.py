@@ -50,9 +50,7 @@ MAX_SEARCH_TEXT = 100
 MAX_SEARCH_RESULTS = 50
 MAX_REASON = 500
 
-INVOICE_NOT_FOUND = "Invoice not found on this account."
 NO_IDENTITY = "I cannot see who is signed in, so I cannot open this account."
-NO_PURCHASES = "There are no purchases on this account yet."
 
 
 @dataclass(frozen=True)
@@ -73,7 +71,7 @@ MODEL_TIMEOUT_SECONDS = 20
 MODEL_MAX_RETRIES = 1
 NOT_YOUR_PURCHASE = "That track is not on this account."
 REQUEST_NOT_DONE = "The request was not completed, so nothing was changed."
-REFUND_ACTIONS = ("refund", "swap")
+SWAP_APPROVED = "Your replacement is approved."
 ALREADY_REQUESTED = "That purchase already has a refund or replacement in progress."
 
 # Refund policy, compiled from the store's policy doc and reviewed. Bump the version on any change.
