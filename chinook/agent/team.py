@@ -51,14 +51,16 @@ class AgentSpec:
 SUBAGENTS = (
     AgentSpec(
         "music_recommendation",
-        "Recommends music, finds albums to finish, remembers taste, and sells album completions.",
+        "Recommends tracks by artist, genre, or taste, and finds and sells albums they have partly "
+        "bought, including what they're closest to finishing.",
         prompts.MUSIC_RECOMMENDATION_PROMPT,
         (recommend_engine, buy_completion),
         extras=(MustUseATool,),
     ),
     AgentSpec(
         "invoice_support",
-        "Handles refunds and replacements, including purchases that will not play.",
+        "Lists what the customer bought, and handles refunds and replacements, including purchases "
+        "that will not play or any problem with an order.",
         prompts.INVOICE_SUPPORT_PROMPT,
         (list_purchases, find_purchases, search_catalog, request_refund),
         approvals=("request_refund",),
@@ -136,7 +138,7 @@ def delegate(spec: AgentSpec, subagent):
     def ask(task: str, runtime: ToolRuntime[CustomerContext]) -> str:
         # The customer's own words, and what was already asked, survive a paraphrased task.
         turns = recent_turns((runtime.state or {}).get("messages", []))
-        content = f"{task}\n\nRecent conversation:\n{turns}" if turns else task
+        content = f"{task}\n\nRecent conversation, for context only:\n{turns}" if turns else task
         result = subagent.invoke(
             {"messages": [{"role": "user", "content": content}]},
             context=CustomerContext(customer_id=resolve_customer(runtime)),
