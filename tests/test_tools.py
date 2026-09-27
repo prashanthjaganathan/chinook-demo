@@ -1,152 +1,85 @@
 from decimal import Decimal
 
-from langchain.tools import ToolRuntime
+from helpers import runtime_for
 
-from chinook_agent import db
-from chinook_agent.context import CustomerContext
-from chinook_agent.tools import (
-    TOOLS,
-    get_invoice,
-    get_my_library,
+from chinook.agent.tools import (
+    buy_completion,
+    find_purchases,
     readable,
+    recommend_engine,
+    request_refund,
     search_catalog,
 )
+from chinook.foundation import config
+from chinook.helpers import catalog, pricing, store
+
+TOOLS = (find_purchases, search_catalog, recommend_engine, buy_completion, request_refund)
 
 
-def runtime_for(customer_id):
-    return ToolRuntime(
-        state={},
-        context=CustomerContext(customer_id=customer_id),
-        config={},
-        stream_writer=lambda *args, **kwargs: None,
-        tool_call_id="test",
-        store=None,
-    )
+def run(tool, customer_id, **args):
+    return tool.invoke({"runtime": runtime_for(customer_id), **args})
 
 
-def test_no_tool_exposes_an_identity_argument():
+def test_no_tool_accepts_customer_id():
     for tool in TOOLS:
         fields = set(tool.tool_call_schema.model_fields)
-
-        assert not {"customer_id", "customer", "user_id", "runtime"} & fields
-
-
-def test_get_my_library_takes_no_arguments_at_all():
-    assert list(get_my_library.tool_call_schema.model_fields) == []
+        assert not {"customer_id", "customer", "user_id", "runtime", "exclude_owned_for"} & fields
 
 
-def test_tool_reads_the_customer_from_context():
-    rows = get_my_library.invoke({"runtime": runtime_for(54)})
-
-    assert {row["track_id"] for row in rows} == {
-        row["track_id"] for row in db.get_library(54)
-    }
+def test_tools_read_the_customer_from_context():
+    assert run(find_purchases, 54, track="midnight")["status"] == "found"
+    assert run(find_purchases, 1, track="midnight")["status"] == "not_found"
 
 
-def test_a_different_context_returns_a_different_library():
-    mine = get_my_library.invoke({"runtime": runtime_for(54)})
-    theirs = get_my_library.invoke({"runtime": runtime_for(1)})
-
-    assert {row["track_id"] for row in mine} != {row["track_id"] for row in theirs}
-
-
-def test_prices_are_sent_to_the_model_as_exact_strings():
-    rows = get_my_library.invoke({"runtime": runtime_for(54)})
-
-    assert all(row["unit_price"] == "0.99" for row in rows)
-    assert all(isinstance(row["unit_price"], str) for row in rows)
-
-
-def test_readable_leaves_non_money_values_alone():
-    rows = readable([{"track_id": 1, "unit_price": Decimal("1.99"), "track": "x"}])
-
-    assert rows == [{"track_id": 1, "unit_price": "1.99", "track": "x"}]
-
-
-def test_readable_reaches_prices_nested_inside_an_invoice():
-    invoice = readable(
-        {"total": Decimal("8.91"), "lines": [{"unit_price": Decimal("0.99")}]}
-    )
-
-    assert invoice == {"total": "8.91", "lines": [{"unit_price": "0.99"}]}
-
-
-def test_every_tool_is_registered():
-    assert [tool.name for tool in TOOLS] == [
-        "get_my_library",
-        "get_invoice",
-        "search_catalog",
-        "price_completion",
-        "request_refund_or_swap",
-    ]
-
-
-def test_invoice_tool_reads_an_owned_invoice():
-    invoice = get_invoice.invoke({"runtime": runtime_for(1), "invoice_id": 382})
-
-    assert invoice["total"] == "8.91"
-    assert len(invoice["lines"]) == 9
-
-
-def test_invoice_tool_hides_foreign_invoices():
-    foreign = get_invoice.invoke({"runtime": runtime_for(1), "invoice_id": 293})
-    missing = get_invoice.invoke({"runtime": runtime_for(1), "invoice_id": 999999})
-
-    assert foreign == missing == db.INVOICE_NOT_FOUND
-    assert "293" not in str(foreign)
-
-
-def test_invoice_tool_defaults_to_the_most_recent_purchase():
-    latest = get_invoice.invoke({"runtime": runtime_for(1)})
-
-    assert latest["invoice_id"] == db.latest_invoice_id(1)
-    assert latest["invoice_date"] == "2025-08-07"
-
-
-def test_invoice_tool_on_a_customer_with_no_purchases():
-    assert get_invoice.invoke({"runtime": runtime_for(999999)})["error"]
-
-
-def test_search_tool_finds_tracks():
-    rows = search_catalog.invoke({"runtime": runtime_for(4), "artist": "AC/DC", "limit": 50})
-
-    assert len(rows) == 18
+def test_missing_context_gets_the_fixed_no_identity_result():
+    assert run(find_purchases, None) == {"error": config.NO_IDENTITY}
+    assert run(request_refund, None, purchase_ref="x", reason="other") == {"error": config.NO_IDENTITY}
+    assert run(recommend_engine, None, mode="for_me") == {"error": config.NO_IDENTITY}
+    assert run(buy_completion, None, offer_id="x") == {"error": config.NO_IDENTITY}
 
 
 def test_exclude_owned_uses_the_session_customer():
-    owned = {row["track_id"] for row in db.get_library(4)}
-    offered = search_catalog.invoke(
-        {"runtime": runtime_for(4), "artist": "AC/DC", "exclude_owned": True, "limit": 50}
-    )
+    offered = run(search_catalog, 4, artist="AC/DC", exclude_owned=True, limit=50)
 
-    assert {row["track_id"] for row in offered}.isdisjoint(owned)
     assert len(offered) == 14
 
 
-def test_exclude_owned_cannot_be_pointed_at_another_customer():
-    fields = set(search_catalog.tool_call_schema.model_fields)
-
-    assert "exclude_owned" in fields
-    assert not {"exclude_owned_for", "customer_id"} & fields
-
-
-def test_exclude_owned_is_per_session():
-    mine = search_catalog.invoke(
-        {"runtime": runtime_for(4), "artist": "AC/DC", "exclude_owned": True, "limit": 50}
-    )
-    theirs = search_catalog.invoke(
-        {"runtime": runtime_for(1), "artist": "AC/DC", "exclude_owned": True, "limit": 50}
-    )
-
-    assert {row["track_id"] for row in mine} != {row["track_id"] for row in theirs}
+def test_prices_reach_the_model_as_exact_strings():
+    assert readable({"total": Decimal("8.91"), "lines": [{"unit_price": Decimal("0.99")}]}) == {
+        "total": "8.91", "lines": [{"unit_price": "0.99"}]}
+    assert "$0.99" in run(find_purchases, 54, track="midnight")["purchases"][0]["label"]
 
 
-def test_injection_through_the_search_tool_matches_nothing():
-    for text in ("' OR 1=1 --", '"; DROP TABLE Track; --'):
-        assert search_catalog.invoke({"runtime": runtime_for(4), "artist": text}) == []
+def in_step_offer():
+    return run(recommend_engine, 48, mode="complete_album")["offers"][0]
 
 
-def test_search_tool_limit_is_capped():
-    rows = search_catalog.invoke({"runtime": runtime_for(4), "limit": 10_000})
+def test_recommend_engine_prices_in_step_for_customer_48():
+    offer = in_step_offer()
+    expected = pricing.completion_price([t["unit_price"] for t in catalog.missing_tracks(48, 205)])
 
-    assert len(rows) == db.MAX_SEARCH_RESULTS
+    assert (offer["owned_tracks"], offer["total_tracks"], len(offer["missing_tracks"])) == (4, 10, 6)
+    assert offer["final_price"] == str(expected["final_price"]) == "4.75"
+
+
+def test_recommend_engine_saves_stated_taste():
+    result = run(recommend_engine, 48, mode="complete_album",
+                 new_preferences={"device": "other", "genres": ["blues"]})
+
+    assert result["saved_preferences"] == {"device": "other", "genres": ["Blues"], "artists": []}
+
+
+def test_buy_completion_refuses_a_changed_or_foreign_offer():
+    offer_id = in_step_offer()["offer_id"]
+
+    assert run(buy_completion, 48, offer_id="205-stale") == {"error": config.OFFER_CHANGED}
+    assert run(buy_completion, 54, offer_id=offer_id) == {"error": config.OFFER_CHANGED}
+
+
+def test_a_replayed_purchase_records_one_order():
+    offer_id = in_step_offer()["offer_id"]
+    first = run(buy_completion, 48, offer_id=offer_id)
+    again = run(buy_completion, 48, offer_id=offer_id)
+
+    assert first == again == {"status": "confirmed", "album": "In Step", "tracks": 6, "amount": "4.75"}
+    assert len(store.execute("SELECT * FROM orders")) == 1

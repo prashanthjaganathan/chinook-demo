@@ -128,7 +128,7 @@ wheels = [
 ]
 
 [[package]]
-name = "chinook-agent"
+name = "chinook"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
@@ -141,13 +141,14 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "debugpy" },
     { name = "langgraph-cli", extra = ["inmem"] },
     { name = "pytest" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "langchain", specifier = ">=1.0" },
+    { name = "langchain", specifier = ">=1.4.2" },
     { name = "langchain-anthropic", specifier = ">=1.7.4" },
     { name = "langchain-openai", specifier = ">=1.6.6" },
     { name = "langgraph", specifier = ">=1.2.12" },
@@ -156,6 +157,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "debugpy", specifier = ">=1.8" },
     { name = "langgraph-cli", extras = ["inmem"], specifier = ">=0.4.32" },
     { name = "pytest", specifier = ">=8" },
 ]
@@ -234,6 +236,19 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/63/8e/f1f955e0921dd2b6d22eae7e8d24a4c4b638d10735ffbf6a71f99eb0fcb8/cryptography-50.0.1-cp39-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:fd3718b960d0b5dd213cdf03f3bcb7000e69dda0de8b956061947ff6bcff5558", size = 4888413, upload-time = "2026-08-25T19:45:20.4Z" },
     { url = "https://files.pythonhosted.org/packages/1f/ab/89e2b798d2c3925f82e2bb72d5979f3d2f6da2dd22ef4a8cd8b70d920039/cryptography-50.0.1-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:2a93d05e34d5f67fba6f891fe85d929999baa7195e853923ea6d7576c9e68c5e", size = 5044355, upload-time = "2026-08-25T19:45:22.353Z" },
     { url = "https://files.pythonhosted.org/packages/99/89/87ef49ffe383ef4e147d27b7bf2088fb0b54ea409dd87b5a89442e5828a5/cryptography-50.0.1-cp39-abi3-win_amd64.whl", hash = "sha256:55d16b1ef3ee0958d893a977b19777887e546c9954ea81b200c3301a864013f2", size = 3875429, upload-time = "2026-08-25T19:45:24.418Z" },
+]
+
+[[package]]
+name = "debugpy"
+version = "1.8.22"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/44/9d/3cb6693342acf96802dba89934a5b8da43c201d764ebd1f2c0514a3d42bd/debugpy-1.8.22.tar.gz", hash = "sha256:e489c7268e1c7b41e13b438d9c533d2a7af73fb59bf8cd30fead8286c1c39c4e", size = 1710877, upload-time = "2026-09-15T21:44:02.578Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/73/21/5c7f5c66eaeee57c9dadb0bbff22efddc8d99cdbd3d036c806175f1828cc/debugpy-1.8.22-cp312-cp312-macosx_15_0_universal2.whl", hash = "sha256:4ad076f4f66cb8acb79e4384d48b1ea60a0b1957aa0b1112d4887ea3a4df60e0", size = 2499375, upload-time = "2026-09-15T21:44:18.478Z" },
+    { url = "https://files.pythonhosted.org/packages/7e/ec/7389798843643ea5bc6a08480ba1b855377c70e2ed90189c0a03594e401e/debugpy-1.8.22-cp312-cp312-manylinux_2_34_x86_64.whl", hash = "sha256:8a697acec45dbc70d17fb5d9f4f61989fc294d273c69de487fd10cb35fdd75eb", size = 4000941, upload-time = "2026-09-15T21:44:20.245Z" },
+    { url = "https://files.pythonhosted.org/packages/20/f4/64ce7a2499550929e08654360b270409eeda3e321b7c27027d9c919aa36b/debugpy-1.8.22-cp312-cp312-win32.whl", hash = "sha256:12bc7f368182b517cf26c76a2393fff65354e365fa1552b6241e66edff17997b", size = 5359040, upload-time = "2026-09-15T21:44:22.218Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/fe/e7d3b72874cdd327bda295d1995a01e426857ae9cbaaba74fd997bc3afbc/debugpy-1.8.22-cp312-cp312-win_amd64.whl", hash = "sha256:371a4ba4a5975eb958393903f3254cf983da7b1c7c178b3f987ee427f42515e3", size = 5398304, upload-time = "2026-09-15T21:44:24.119Z" },
+    { url = "https://files.pythonhosted.org/packages/56/3d/c7dc9f35bc9e22cdb53679f844bee40fd5cff871862f60595869a433400d/debugpy-1.8.22-py2.py3-none-any.whl", hash = "sha256:a9e9d3550e15ca479c59333e90845029190531f0cacfedab3b815a57bd913947", size = 5374857, upload-time = "2026-09-15T21:44:54.454Z" },
 ]
 
 [[package]]
@@ -596,7 +611,7 @@ wheels = [
 
 [[package]]
 name = "langgraph-api"
-version = "0.14.4"
+version = "0.15.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -635,9 +650,9 @@ dependencies = [
     { name = "websockets" },
     { name = "zstandard" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/86/47/0abc336ea9afcdba7e9364d46d8f056af0b2c390a524c54214f9a27651b9/langgraph_api-0.14.4.tar.gz", hash = "sha256:89b4f11c47f6aaa67e76aca5ad067de6eab7b2c39d7597f687ae60a0c993ccec", size = 811842, upload-time = "2026-09-23T01:49:20.31Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/dc/7a/234991138592ce3143f124f1c656d8b191556ae38aa8a1222dcaee64b266/langgraph_api-0.15.1.tar.gz", hash = "sha256:2a435197949388ea18a55de92d1b404c6cd518b31d24ab5f00d566737cfda5dd", size = 825578, upload-time = "2026-09-25T17:47:18.863Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8a/7c/54848c4a341f25db385cd54f7bf6da9747483122f734c5dab4966fbbe61d/langgraph_api-0.14.4-py3-none-any.whl", hash = "sha256:69d5a21134f973ed2fbeddf985b86e1b17a232169f1e489fa374e79f3b985ac3", size = 622435, upload-time = "2026-09-23T01:49:18.684Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/a8/b80341369c961e919d90eb67bd13cd142499ef190e5c37cf993e1e20677c/langgraph_api-0.15.1-py3-none-any.whl", hash = "sha256:d2ae79d92940ffd68c8ecfe714168d883c885c7f55a6017b530ad05d7cc06194", size = 637446, upload-time = "2026-09-25T17:47:17.616Z" },
 ]
 
 [[package]]
@@ -690,7 +705,7 @@ wheels = [
 
 [[package]]
 name = "langgraph-runtime-inmem"
-version = "0.34.1"
+version = "0.35.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "blockbuster" },
@@ -701,9 +716,9 @@ dependencies = [
     { name = "starlette" },
     { name = "structlog" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/31/36/078d3247e3d493dfd1c6adb797633606cca195d204454bde1cde25b31ca2/langgraph_runtime_inmem-0.34.1.tar.gz", hash = "sha256:0e0c83a0bb160e99d217c0813cb46d42da50e4b6b366b4a8ce4adb448397e31a", size = 133739, upload-time = "2026-09-14T20:40:23.254Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7e/03/ac70f8ddd547f72813bf97a02c1a4fa1b70d06a25240a0634da2aaa0acfa/langgraph_runtime_inmem-0.35.1.tar.gz", hash = "sha256:ec6023a6a9e6d1ab08db06dfb7ee48de23c5fc1987f31229f123fe262a7468db", size = 133741, upload-time = "2026-09-25T17:46:00.202Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9d/7b/d741c0c2a6d3f0d6c4c8c78f95bbd2b6b101d7de544263117cbeafb1cb02/langgraph_runtime_inmem-0.34.1-py3-none-any.whl", hash = "sha256:82f55be0dd05a9680b90b53d14aa44303fba83ba7e12ba94279839173d163e2c", size = 52966, upload-time = "2026-09-14T20:40:22.085Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/b5/3580f1ae3347821bf2f05865609ac2406148cef0c33b8a67832b773fb253/langgraph_runtime_inmem-0.35.1-py3-none-any.whl", hash = "sha256:a5a7ccfeb20b8d241bf55adf7992062c9b8af9e451ad197bd7a876666a1837ee", size = 52988, upload-time = "2026-09-25T17:45:58.894Z" },
 ]
 
 [[package]]
@@ -724,7 +739,7 @@ wheels = [
 
 [[package]]
 name = "langsmith"
-version = "0.14.0"
+version = "0.14.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -742,9 +757,9 @@ dependencies = [
     { name = "xxhash" },
     { name = "zstandard" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7d/bb/4f39a8d864618aab01c4fc374a9f579ad6e0f3c91f32cfbd86f0180cb9e1/langsmith-0.14.0.tar.gz", hash = "sha256:294a02addc2358fab390156b74fa942e2dd40b711f6507c5f26b5c208cc89e15", size = 4951467, upload-time = "2026-09-21T18:59:37.964Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/96/23/ba753811d6d768f4d98d0336ba49c2b3021afeeaa59a8f63ab83bf83efe7/langsmith-0.14.1.tar.gz", hash = "sha256:0b5cd2473420c9c5acef33a9bafe6c812a7cf96741e9a5af465b1d93bf77f7ae", size = 4966485, upload-time = "2026-09-25T17:38:08.216Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4d/be/d55279f7bfc43763fd479aa526d6f952fa93aaf4d86a40919f78726691cc/langsmith-0.14.0-py3-none-any.whl", hash = "sha256:1a89e52c24edd6f4c24d8cfb32857814ceb5b9bec344a2850e86ab38475de362", size = 805011, upload-time = "2026-09-21T18:59:36.199Z" },
+    { url = "https://files.pythonhosted.org/packages/04/d6/1771421302dd230d3e52f29546b187cda824cff1443031067b69d46207ee/langsmith-0.14.1-py3-none-any.whl", hash = "sha256:dcfd8a25ba72d8663024bd87df02e372e470f43e18f4a726f37fbacc772c0193", size = 812092, upload-time = "2026-09-25T17:38:05.704Z" },
 ]
 
 [package.optional-dependencies]
@@ -1160,15 +1175,15 @@ wheels = [
 
 [[package]]
 name = "sse-starlette"
-version = "3.3.4"
+version = "3.4.11"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
     { name = "starlette" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/26/8c/f9290339ef6d79badbc010f067cd769d6601ec11a57d78569c683fb4dd87/sse_starlette-3.3.4.tar.gz", hash = "sha256:aaf92fc067af8a5427192895ac028e947b484ac01edbc3caf00e7e7137c7bef1", size = 32427, upload-time = "2026-03-29T09:00:23.307Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2b/54/6767bb789b2f2fed6e0f953df949cd39dc263a384c1b65a95232598621d6/sse_starlette-3.4.11.tar.gz", hash = "sha256:1bae716c02f3e6f294be41ff333220692dae7c3cbab077c900f159676719dade", size = 34972, upload-time = "2026-09-05T12:11:04.607Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f8/7f/3de5402f39890ac5660b86bcf5c03f9d855dad5c4ed764866d7b592b46fd/sse_starlette-3.3.4-py3-none-any.whl", hash = "sha256:84bb06e58939a8b38d8341f1bc9792f06c2b53f48c608dd207582b664fc8f3c1", size = 14330, upload-time = "2026-03-29T09:00:21.846Z" },
+    { url = "https://files.pythonhosted.org/packages/98/6a/2ba3ed4a69babf3afdddf7d8314a48d87562c0a442206bbc2a1b50d5efc0/sse_starlette-3.4.11-py3-none-any.whl", hash = "sha256:c7b2244bdff016fe7f64e10075e89a3e6bbf899649cc89b0fe884b5545042453", size = 17122, upload-time = "2026-09-05T12:11:03.195Z" },
 ]
 
 [[package]]
@@ -1284,15 +1299,15 @@ wheels = [
 
 [[package]]
 name = "uvicorn"
-version = "0.53.0"
+version = "0.54.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
     { name = "h11" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5d/ad/04bbb797c84fc1f26cb171f7394716f4865ffb8d8c5e1eef42565c2dfa6b/uvicorn-0.53.0.tar.gz", hash = "sha256:a9356f0cb89b3b8621529c5d5eebd69bfe154f4c3f68b4cf2de47e45fa855c2e", size = 110881, upload-time = "2026-09-14T07:44:23.815Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/da/34/30e9280707135d2cfc589dfff3cb796bd07a3aeb1a3e415ba09dd89d7bb4/uvicorn-0.54.0.tar.gz", hash = "sha256:a2e33cbfaa0306f8e6b0c13e0cb89d7d7a2da3e62b90c66e18c33d9807b28620", size = 112283, upload-time = "2026-09-25T06:52:37.601Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/76/18/0eea75741ee812e9f598b687619ce2454f6c3a1c5cd21ea990ec6bd26f45/uvicorn-0.53.0-py3-none-any.whl", hash = "sha256:e8dca71ec86dce5f04e333f0d56cdedf942446e6643b9cea1af0d6d3a02cb03e", size = 87081, upload-time = "2026-09-14T07:44:22.179Z" },
+    { url = "https://files.pythonhosted.org/packages/38/0c/b54a4fdd7f90a3af8b02ebc9ce6712c2c208b7926a2f7bad95c33ebbe943/uvicorn-0.54.0-py3-none-any.whl", hash = "sha256:505bdb0f318731d45f1f712071fc781a8981f6847a31c902c9f5e652d4f67faf", size = 87427, upload-time = "2026-09-25T06:52:35.829Z" },
 ]
 
 [[package]]
