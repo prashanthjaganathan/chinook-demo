@@ -4,7 +4,6 @@ from helpers import runtime_for
 
 from chinook.agent.tools import (
     buy_completion,
-    describe_purchase,
     find_purchases,
     readable,
     recommend_engine,
@@ -84,11 +83,3 @@ def test_a_replayed_purchase_records_one_order():
 
     assert first == again == {"status": "confirmed", "album": "In Step", "tracks": 6, "amount": "4.75"}
     assert len(store.execute("SELECT * FROM orders")) == 1
-
-
-def test_the_purchase_confirmation_is_readable():
-    offer_id = in_step_offer()["offer_id"]
-    tool_call = {"args": {"offer_id": offer_id}}
-
-    assert describe_purchase(tool_call, {}, runtime_for(48)) == "Buy 6 tracks on In Step for $4.75?"
-    assert describe_purchase(tool_call, {}, runtime_for(54)) == "This offer is no longer valid."

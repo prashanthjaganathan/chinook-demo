@@ -66,7 +66,7 @@ def recommend_engine(
 ) -> dict:
     """Recommend music, find albums to finish, and remember the customer's taste.
 
-    Pass an artist or song as seed exactly as the customer wrote it. When they pick from
+    Pass an artist, song, or album as seed exactly as the customer wrote it. When they pick from
     returned choices, pass that choice's id as seed_id. Pass any taste they state in new_preferences.
     """
     customer_id = customer_of(runtime)
@@ -80,7 +80,7 @@ def recommend_engine(
 def buy_completion(runtime: ToolRuntime[CustomerContext], offer_id: str) -> dict:
     """Buy the missing tracks of an album, using an offer_id from recommend_engine.
 
-    The customer confirms before anything is recorded.
+    Only call it after the customer has said yes to this offer.
     """
     customer_id = customer_of(runtime)
     if customer_id is None:
@@ -95,15 +95,6 @@ def buy_completion(runtime: ToolRuntime[CustomerContext], offer_id: str) -> dict
         amount=str(offer["final_price"]))
     return {"status": "confirmed", "album": offer["album"],
             "tracks": len(offer["missing_tracks"]), "amount": order["amount"]}
-
-
-def describe_purchase(tool_call, state, runtime) -> str:
-    """The confirmation the customer sees, in words rather than an offer id."""
-    customer_id = customer_of(runtime)
-    offer = engine.current_offer(customer_id, tool_call["args"].get("offer_id", "")) if customer_id else None
-    if offer is None:
-        return "This offer is no longer valid."
-    return f"Buy {len(offer['missing_tracks'])} tracks on {offer['album']} for ${offer['final_price']}?"
 
 
 RefundReason = Literal["wont_play", "bought_by_mistake", "didnt_like_it", "other", "not_given"]
@@ -191,4 +182,4 @@ def describe_refund(tool_call, state, runtime) -> str:
     return f"{verb} {line['track']} (${line['unit_price']}, bought {line['invoice_date']}) because {why}?"
 
 
-APPROVAL_TEXT = {"buy_completion": describe_purchase, "request_refund": describe_refund}
+APPROVAL_TEXT = {"request_refund": describe_refund}

@@ -139,7 +139,7 @@ def test_approval_allows_only_approve_and_reject():
 
     assert set(allowed["allowed_decisions"] if isinstance(allowed, dict) else allowed.allowed_decisions) == {
         "approve", "reject"}
-    assert team.approval(team.spec_named("music_recommendation"))[0].interrupt_on["buy_completion"]
+    assert team.approval(team.spec_named("music_recommendation")) == []
 
 
 @pytest.mark.parametrize("bad", ["", {"decisions": "approve"}])

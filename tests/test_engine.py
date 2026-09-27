@@ -111,3 +111,18 @@ def test_current_offer_matches_only_a_fresh_own_offer():
 def test_unknown_mode_is_rejected():
     with pytest.raises(ValueError):
         engine.recommend(48, "surprise_me")
+
+
+def test_a_named_album_outside_the_top_five_still_gets_its_offer():
+    result = engine.recommend(48, "complete_album", "In yr Honor disc 1")
+
+    assert [o["album"] for o in result["offers"]] == ["In Your Honor [Disc 1]"]
+    assert engine.current_offer(48, result["offers"][0]["offer_id"])
+    assert engine.recommend(48, "complete_album", "qwxzv")["status"] == "not_found"
+
+
+def test_recommendations_only_offer_albums_from_the_top_five():
+    top = [a["album_id"] for a in catalog.partial_albums(48)][: config.RECOMMEND_LIMIT]
+    offers = engine.recommend(48, "by_artist", "foo fighters")["offers"]
+
+    assert offers and all(o["album_id"] in top for o in offers)

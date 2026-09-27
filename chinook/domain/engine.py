@@ -103,10 +103,21 @@ def recommend(customer_id: int, mode: str, seed=None, seed_id=None, new_preferen
     prefs, unknown = update_preferences(customer_id, new_preferences)
     result = {"saved_preferences": prefs, "not_recognized": unknown}
     partial = {a["album_id"]: a for a in catalog.partial_albums(customer_id)}
+    top = list(partial)[: config.RECOMMEND_LIMIT]
 
     if mode == "complete_album":
-        offers = [offer_for(customer_id, a) for a in list(partial.values())[: config.RECOMMEND_LIMIT]]
-        return {**result, "status": "ok", "offers": offers}
+        if seed is None and seed_id is None:
+            return {**result, "status": "ok", "offers": [offer_for(customer_id, partial[a]) for a in top]}
+        # A named album is matched against every album they started, not just the top few.
+        rows = [{"id": a["album_id"], "name": a["album"], "label": f"{a['album']} by {a['artist']}"}
+                for a in partial.values()]
+        found = ({"status": "found", "id": catalog.valid_id(seed_id, "seed_id")} if seed_id is not None
+                 else resolver.resolve(seed, rows))
+        if found["status"] == "found" and found["id"] not in partial:
+            found = {"status": "not_found", "text": seed}
+        if found["status"] != "found":
+            return {**result, **found}
+        return {**result, "status": "ok", "offers": [offer_for(customer_id, partial[found["id"]])]}
 
     if mode == "for_me":
         artists, genres = taste(customer_id, prefs)
@@ -131,6 +142,6 @@ def recommend(customer_id: int, mode: str, seed=None, seed_id=None, new_preferen
 
     tracks = ranked(customer_id, artists, genres, playable_only=prefs.get("device") == "other")
     albums = dict.fromkeys(t["album_id"] for t in tracks)
-    # A recommendation from an album they already started becomes a completion offer.
-    offers = [offer_for(customer_id, partial[a]) for a in albums if a in partial]
+    # Only albums among their top few to finish become offers, so every offer shown can be bought.
+    offers = [offer_for(customer_id, partial[a]) for a in albums if a in top]
     return {**result, "status": "ok", "tracks": tracks, "offers": offers}

@@ -53,7 +53,6 @@ SUBAGENTS = (
         "Recommends music, finds albums to finish, remembers taste, and sells album completions.",
         prompts.MUSIC_RECOMMENDATION_PROMPT,
         (recommend_engine, buy_completion),
-        approvals=("buy_completion",),
         extras=(MustUseATool,),
     ),
     AgentSpec(
