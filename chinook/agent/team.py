@@ -25,6 +25,7 @@ from chinook.agent.middleware import (
 from chinook.agent.tools import (
     buy_completion,
     find_purchases,
+    list_purchases,
     recommend_engine,
     request_refund,
     resolve_customer,
@@ -59,7 +60,7 @@ SUBAGENTS = (
         "invoice_support",
         "Handles refunds and replacements, including purchases that will not play.",
         prompts.INVOICE_SUPPORT_PROMPT,
-        (find_purchases, search_catalog, request_refund),
+        (list_purchases, find_purchases, search_catalog, request_refund),
         approvals=("request_refund",),
         extras=(MustUseATool,),
     ),

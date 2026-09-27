@@ -122,6 +122,21 @@ def find_purchases(
 
 
 @tool
+def list_purchases(runtime: ToolRuntime[CustomerContext]) -> dict:
+    """List this customer's most recent purchases, newest first, each with a purchase_ref."""
+    customer_id = customer_of(runtime)
+    if customer_id is None:
+        return {"error": config.NO_IDENTITY}
+    lines = catalog.customer_purchases(customer_id)
+    return readable({
+        "total": len(lines),
+        "purchases": [{"purchase_ref": refunds.purchase_ref(customer_id, line["invoice_line_id"]),
+                       "label": refunds.label(line), "format": line["media_type"]}
+                      for line in lines[: config.MAX_LISTED_PURCHASES]],
+    })
+
+
+@tool
 def request_refund(
     runtime: ToolRuntime[CustomerContext],
     purchase_ref: str,

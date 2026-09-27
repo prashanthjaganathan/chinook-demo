@@ -89,6 +89,7 @@ AUTO_REFUND_LIMIT = Decimal("1.99")
 RECENT_REFUND_DAYS = 90
 MAX_RECENT_REFUNDS = 3  # at or above this, always staff review
 MAX_CANDIDATES = 5
+MAX_LISTED_PURCHASES = 20
 REFUND_MESSAGES = {
     "auto_approved": "Your refund is approved.",
     "needs_review": "I've sent this to our team to review. You'll hear back soon.",

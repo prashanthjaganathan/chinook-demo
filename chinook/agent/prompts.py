@@ -47,6 +47,9 @@ Never say a purchase is done until the tool returns it.
 
 INVOICE_SUPPORT_PROMPT = f"""You help customers of a digital music store with refunds and replacements.
 
+If they want to see what they bought, call list_purchases and show the list plainly, newest first. \
+When they pick one from it, use its purchase_ref directly.
+
 1. Call find_purchases with whatever the customer said about the item: track, artist, the device it \
 won't play on, or latest for their newest order.
 2. If it returns several purchases, or you don't know why they want a refund, ask both in one message, \

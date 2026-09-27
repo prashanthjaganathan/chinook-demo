@@ -5,15 +5,17 @@ from helpers import runtime_for
 from chinook.agent.tools import (
     buy_completion,
     find_purchases,
+    list_purchases,
     readable,
     recommend_engine,
     request_refund,
     search_catalog,
 )
+from chinook.domain import refunds
 from chinook.foundation import config
 from chinook.helpers import catalog, pricing, store
 
-TOOLS = (find_purchases, search_catalog, recommend_engine, buy_completion, request_refund)
+TOOLS = (list_purchases, find_purchases, search_catalog, recommend_engine, buy_completion, request_refund)
 
 
 def run(tool, customer_id, **args):
@@ -33,6 +35,7 @@ def test_tools_read_the_customer_from_context():
 
 def test_missing_context_gets_the_fixed_no_identity_result():
     assert run(find_purchases, None) == {"error": config.NO_IDENTITY}
+    assert run(list_purchases, None) == {"error": config.NO_IDENTITY}
     assert run(request_refund, None, purchase_ref="x", reason="other") == {"error": config.NO_IDENTITY}
     assert run(recommend_engine, None) == {"error": config.NO_IDENTITY}
     assert run(buy_completion, None, offer_id="x") == {"error": config.NO_IDENTITY}
@@ -83,3 +86,14 @@ def test_a_replayed_purchase_records_one_order():
 
     assert first == again == {"status": "confirmed", "album": "In Step", "tracks": 6, "amount": "4.75"}
     assert len(store.execute("SELECT * FROM orders")) == 1
+
+
+def test_list_purchases_shows_only_own_purchases_newest_first_with_usable_refs():
+    listed = run(list_purchases, 54)
+    lines = catalog.customer_purchases(54)
+
+    assert listed["total"] == len(lines)
+    assert len(listed["purchases"]) == min(len(lines), config.MAX_LISTED_PURCHASES)
+    assert listed["purchases"][0]["label"] == refunds.label(lines[0])
+    assert all(refunds.purchase_for_ref(54, p["purchase_ref"]) for p in listed["purchases"])
+    assert not any(refunds.purchase_for_ref(1, p["purchase_ref"]) for p in listed["purchases"])
