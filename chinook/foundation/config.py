@@ -25,7 +25,8 @@ def plays_anywhere(media_type: str) -> bool:
 def media_kind(media_type: str) -> str:
     return "video" if media_type in VIDEO_FORMATS else "audio"
 
-
+# Share of an album the customer must already own before its completion is offered.
+COMPLETION_MIN_OWNED = Decimal("0.4")
 RECOMMEND_LIMIT = 5
 MAX_PREFERENCE_ITEMS = 5
 ASK_DEVICE = "Do you listen on an Apple device or something else?"

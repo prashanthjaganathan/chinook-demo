@@ -34,7 +34,7 @@ def test_tools_read_the_customer_from_context():
 def test_missing_context_gets_the_fixed_no_identity_result():
     assert run(find_purchases, None) == {"error": config.NO_IDENTITY}
     assert run(request_refund, None, purchase_ref="x", reason="other") == {"error": config.NO_IDENTITY}
-    assert run(recommend_engine, None, mode="for_me") == {"error": config.NO_IDENTITY}
+    assert run(recommend_engine, None) == {"error": config.NO_IDENTITY}
     assert run(buy_completion, None, offer_id="x") == {"error": config.NO_IDENTITY}
 
 
@@ -51,7 +51,7 @@ def test_prices_reach_the_model_as_exact_strings():
 
 
 def in_step_offer():
-    return run(recommend_engine, 48, mode="complete_album")["offers"][0]
+    return run(recommend_engine, 48)["offers"][0]
 
 
 def test_recommend_engine_prices_in_step_for_customer_48():
@@ -63,7 +63,7 @@ def test_recommend_engine_prices_in_step_for_customer_48():
 
 
 def test_recommend_engine_saves_stated_taste():
-    result = run(recommend_engine, 48, mode="complete_album",
+    result = run(recommend_engine, 48,
                  new_preferences={"device": "other", "genres": ["blues"]})
 
     assert result["saved_preferences"] == {"device": "other", "genres": ["Blues"], "artists": []}

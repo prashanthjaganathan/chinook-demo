@@ -4,6 +4,7 @@ import pytest
 from helpers import call, once_then, tool_results
 
 from chinook.agent import prompts, team
+from chinook.domain import engine
 from chinook.foundation import config
 from chinook.foundation.context import CustomerContext
 
@@ -28,7 +29,7 @@ def test_music_recommendation_uses_the_engine_but_not_invoices():
 
 def test_a_subagent_runs_its_tools_with_the_given_customer():
     result = ask("music_recommendation", "what should I finish?", 48,
-                 model=once_then(call("recommend_engine", {"mode": "complete_album"})))
+                 model=once_then(call("recommend_engine")))
 
     assert '"In Step"' in tool_results(result["messages"])[0].content or "In Step" in str(
         tool_results(result["messages"])[0].content)
@@ -47,4 +48,5 @@ def test_the_format_table_in_the_prompt_comes_from_config():
 def test_music_recommendation_finds_in_step_for_customer_48():
     answer = ask("music_recommendation", "What am I closest to finishing?", 48)["messages"][-1].text
 
-    assert "In Step" in answer and "4.75" in answer
+    price = str(engine.recommend(48)["offers"][0]["final_price"])
+    assert "In Step" in answer and price in answer

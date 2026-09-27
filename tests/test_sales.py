@@ -18,7 +18,7 @@ live = pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="needs a real 
 def buys_the_first_offer(messages):
     results = tool_results(messages)
     if not results:
-        return call("recommend_engine", {"mode": "complete_album"})
+        return call("recommend_engine")
     if len(results) == 1:
         offer_id = json.loads(results[0].content)["offers"][0]["offer_id"]
         return call("buy_completion", {"offer_id": offer_id}, "call-2")
@@ -43,7 +43,7 @@ def orders():
 
 
 def in_step_price():
-    return str(engine.recommend(48, "complete_album")["offers"][0]["final_price"])
+    return str(engine.recommend(48)["offers"][0]["final_price"])
 
 
 def test_a_purchase_is_recorded_once_without_an_approval_pause():
@@ -98,7 +98,7 @@ def test_live_a_squashed_artist_name_resolves():
     result = agent.invoke({"messages": [{"role": "user", "content": "anything by acdc?"}]},
                           context=CustomerContext(customer_id=48))
 
-    assert calls(result, "recommend_engine")[0]["mode"] == "by_artist"
+    assert calls(result, "recommend_engine")[0].get("artist")
     assert "AC/DC" in result["messages"][-1].text
 
 

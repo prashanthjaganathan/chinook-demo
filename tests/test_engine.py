@@ -6,11 +6,15 @@ from chinook.domain import engine
 from chinook.foundation import config
 from chinook.helpers import catalog, store
 
-IN_STEP = 205
+ACDC, IN_STEP, MUSO_KO = 1, 205, 263
 
 
 def track(track_id, media_type, sales):
     return {"track_id": track_id, "album_id": 1, "media_type": media_type, "sales": sales}
+
+
+def offered(result):
+    return [o["album_id"] for o in result["offers"]]
 
 
 @pytest.fixture
@@ -28,64 +32,82 @@ def test_merge_puts_new_first_dedupes_and_caps():
 
     assert merged["device"] == "apple"
     assert merged["genres"] == ["Jazz", "Blues", "Latin", "Pop", "Metal"]
-    assert len(merged["genres"]) == config.MAX_PREFERENCE_ITEMS
 
 
 def test_preferences_are_canonical_and_unknowns_reported():
-    result = engine.recommend(48, "complete_album", new_preferences={"genres": ["rock", "zzzz"]})
+    result = engine.recommend(48, new_preferences={"genres": ["rock", "zzzz"]})
 
     assert result["saved_preferences"]["genres"] == ["Rock"]
     assert result["not_recognized"] == ["zzzz"]
     assert store.get_preferences(48)["genres"] == ["Rock"]
 
 
-def test_complete_album_offers_priced_completions():
-    offers = engine.recommend(48, "complete_album")["offers"]
+def test_for_me_recommends_unowned_tracks_and_every_completable_album():
+    result = engine.recommend(4)
 
-    assert offers[0]["album_id"] == IN_STEP
-    assert offers[0]["final_price"] == offers[0]["list_price"] - offers[0]["discount"]
-    assert all(isinstance(t["unit_price"], Decimal) for t in offers[0]["missing_tracks"])
-
-
-def test_by_artist_resolves_typed_name_and_attaches_offer_for_started_album():
-    result = engine.recommend(48, "by_artist", "foo fitghers")
-
-    assert {t["artist"] for t in result["tracks"]} == {"Foo Fighters"}
-    assert 80 in {o["album_id"] for o in result["offers"]}
-
-
-def test_similar_to_track_offers_choices_then_uses_the_picked_id():
-    result = engine.recommend(48, "similar_to_track", "the trooper")
-    assert result["status"] == "choose"
-    assert "The Trooper by Iron Maiden" in {c["label"] for c in result["choices"]}
-
-    picked = engine.recommend(48, "similar_to_track", seed_id=result["choices"][0]["id"])
-    assert picked["status"] == "ok" and picked["tracks"][0]["artist"] == "Iron Maiden"
-
-
-def test_unknown_seed_is_not_found():
-    assert engine.recommend(48, "by_artist", "qwxzv")["status"] == "not_found"
-
-
-def test_for_me_uses_library_taste():
-    result = engine.recommend(48, "for_me")
-
-    owned = {t["track_id"] for t in catalog.get_library(48)}
+    owned = {t["track_id"] for t in catalog.get_library(4)}
     assert result["status"] == "ok" and result["tracks"]
     assert not owned & {t["track_id"] for t in result["tracks"]}
+    assert offered(result) == [MUSO_KO, ACDC]
+
+
+def test_an_artist_request_offers_only_that_artists_albums():
+    result = engine.recommend(4, artist="acdc")
+
+    assert {t["artist"] for t in result["tracks"]} == {"AC/DC"}
+    assert offered(result) == [ACDC]
+
+
+def test_a_genre_request_offers_only_albums_of_that_genre():
+    rock = engine.recommend(4, genre="rock")
+
+    assert {t["genre"] for t in rock["tracks"]} == {"Rock"}
+    assert offered(rock) == [ACDC]
+    assert offered(engine.recommend(4, genre="world")) == [MUSO_KO]
+
+
+def test_artist_and_genre_together_must_both_match():
+    both = engine.recommend(4, artist="acdc", genre="rock")
+    none = engine.recommend(4, artist="acdc", genre="jazz")
+
+    assert {t["artist"] for t in both["tracks"]} == {"AC/DC"} and offered(both) == [ACDC]
+    assert none["tracks"] == [] and offered(none) == []
+
+
+def test_the_threshold_decides_which_albums_are_offered(monkeypatch):
+    monkeypatch.setattr(config, "COMPLETION_MIN_OWNED", Decimal("0.5"))
+
+    assert offered(engine.recommend(4)) == [MUSO_KO]
+
+
+def test_unknown_and_ambiguous_names_say_which_kind(monkeypatch):
+    assert engine.recommend(4, artist="qwxzv")["status"] == "not_found"
+    assert engine.recommend(4, genre="qwxzv")["kind"] == "genre"
+
+    twins = [{"id": 1, "name": "Queen", "label": "Queen"}, {"id": 2, "name": "Queen", "label": "Queen (UK)"}]
+    monkeypatch.setattr(catalog, "names", lambda kind: twins)
+    choice = engine.recommend(4, artist="queen")
+    assert (choice["status"], choice["kind"]) == ("choose", "artist")
+
+
+def test_a_picked_id_is_used_directly():
+    assert offered(engine.recommend(4, artist_id=ACDC)) == [ACDC]
+
+
+def test_the_same_request_gives_the_same_answer():
+    assert engine.recommend(4, genre="rock") == engine.recommend(4, genre="rock")
 
 
 def test_new_customer_is_asked_device_then_genres_never_twice(new_customer):
-    assert engine.recommend(new_customer, "for_me")["slot"] == "device"
-    assert engine.recommend(new_customer, "for_me")["slot"] == "genres"
+    assert engine.recommend(new_customer)["slot"] == "device"
+    assert engine.recommend(new_customer)["slot"] == "genres"
 
-    third = engine.recommend(new_customer, "for_me")
+    third = engine.recommend(new_customer)
     assert third["status"] == "ok" and third["tracks"]
 
 
 def test_new_customer_with_stated_taste_skips_questions(new_customer):
-    result = engine.recommend(new_customer, "for_me",
-                              new_preferences={"device": "apple", "genres": ["jazz"]})
+    result = engine.recommend(new_customer, new_preferences={"device": "apple", "genres": ["jazz"]})
 
     assert result["status"] == "ok"
     assert {t["genre"] for t in result["tracks"]} == {"Jazz"}
@@ -95,35 +117,16 @@ def test_non_apple_listeners_get_no_protected_formats(monkeypatch):
     rows = [track(1, "Protected AAC audio file", 9), track(2, "MPEG audio file", 1)]
     monkeypatch.setattr(catalog, "ranked_tracks", lambda customer_id, **where: rows)
 
-    assert [t["track_id"] for t in engine.ranked(48, [], [], playable_only=False)] == [1, 2]
-    assert [t["track_id"] for t in engine.ranked(48, [], [], playable_only=True)] == [2]
+    assert [t["track_id"] for t in engine.ranked(48, [], playable_only=False)] == [1, 2]
+    assert [t["track_id"] for t in engine.ranked(48, [], playable_only=True)] == [2]
 
 
-def test_current_offer_matches_only_a_fresh_own_offer():
-    offer = engine.recommend(48, "complete_album")["offers"][0]["offer_id"]
+def test_current_offer_matches_only_a_fresh_own_completable_offer():
+    offer = engine.recommend(48)["offers"][0]["offer_id"]
+    below = next(a for a in catalog.partial_albums(48) if a["album"] == "In Your Honor [Disc 1]")
 
     assert engine.current_offer(48, offer)["album_id"] == IN_STEP
     assert engine.current_offer(54, offer) is None
     assert engine.current_offer(48, f"{IN_STEP}-0000000000") is None
+    assert engine.current_offer(48, engine.offer_for(48, below)["offer_id"]) is None
     assert engine.current_offer(48, "junk") is None
-
-
-def test_unknown_mode_is_rejected():
-    with pytest.raises(ValueError):
-        engine.recommend(48, "surprise_me")
-
-
-def test_a_named_album_outside_the_top_five_still_gets_its_offer():
-    result = engine.recommend(48, "complete_album", "In yr Honor disc 1")
-
-    assert [o["album"] for o in result["offers"]] == ["In Your Honor [Disc 1]"]
-    assert engine.current_offer(48, result["offers"][0]["offer_id"])
-    assert engine.recommend(48, "complete_album", "qwxzv")["status"] == "not_found"
-    assert len(engine.recommend(48, "complete_album", "")["offers"]) == config.RECOMMEND_LIMIT
-
-
-def test_recommendations_only_offer_albums_from_the_top_five():
-    top = [a["album_id"] for a in catalog.partial_albums(48)][: config.RECOMMEND_LIMIT]
-    offers = engine.recommend(48, "by_artist", "foo fighters")["offers"]
-
-    assert offers and all(o["album_id"] in top for o in offers)

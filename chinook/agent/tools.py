@@ -59,21 +59,23 @@ class Preferences(BaseModel):
 @tool
 def recommend_engine(
     runtime: ToolRuntime[CustomerContext],
-    mode: Literal["complete_album", "by_artist", "similar_to_track", "for_me"],
-    seed: str | None = None,
-    seed_id: int | None = None,
+    artist: str | None = None,
+    genre: str | None = None,
+    artist_id: int | None = None,
+    genre_id: int | None = None,
     new_preferences: Preferences | None = None,
 ) -> dict:
-    """Recommend music, find albums to finish, and remember the customer's taste.
+    """Recommend tracks the customer doesn't own, plus album completions that fit the request.
 
-    Pass an artist, song, or album as seed exactly as the customer wrote it. When they pick from
-    returned choices, pass that choice's id as seed_id. Pass any taste they state in new_preferences.
+    Pass artist and/or genre exactly as the customer wrote them; leave both empty for personal picks.
+    If the result has choices, call again with the chosen id as artist_id or genre_id (see its kind).
+    Pass any taste they state in new_preferences.
     """
     customer_id = customer_of(runtime)
     if customer_id is None:
         return {"error": config.NO_IDENTITY}
     prefs = new_preferences.model_dump(exclude_none=True) if new_preferences else None
-    return readable(engine.recommend(customer_id, mode, seed, seed_id, prefs))
+    return readable(engine.recommend(customer_id, artist, genre, artist_id, genre_id, prefs))
 
 
 @tool
