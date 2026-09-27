@@ -5,8 +5,6 @@ from collections import Counter
 from chinook.foundation import config
 from chinook.helpers import catalog, pricing, resolver, store
 
-MODES = ("complete_album", "by_artist", "similar_to_track", "for_me")
-
 
 def offer_id(customer_id, album_id, missing, final_price) -> str:
     raw = f"{customer_id}:{album_id}:{[t['track_id'] for t in missing]}:{final_price}"
@@ -20,10 +18,15 @@ def offer_for(customer_id: int, album: dict) -> dict:
             "offer_id": offer_id(customer_id, album["album_id"], missing, price["final_price"])}
 
 
+def completable(customer_id: int) -> list[dict]:
+    return [a for a in catalog.partial_albums(customer_id)
+            if a["owned_tracks"] >= config.COMPLETION_MIN_OWNED * a["total_tracks"]]
+
+
 def current_offer(customer_id: int, offer: str) -> dict | None:
     """Re-derives the offer now; a stale, foreign, or made-up id matches nothing."""
     album_id = str(offer).split("-", 1)[0]
-    album = next((a for a in catalog.partial_albums(customer_id) if str(a["album_id"]) == album_id), None)
+    album = next((a for a in completable(customer_id) if str(a["album_id"]) == album_id), None)
     fresh = offer_for(customer_id, album) if album else None
     return fresh if fresh and fresh["offer_id"] == offer else None
 
@@ -86,9 +89,8 @@ def next_question(prefs: dict) -> dict | None:
     return None
 
 
-def ranked(customer_id: int, artists: list[int], genres: list[int], playable_only: bool) -> list[dict]:
-    # Artist matches rank above genre matches; within a tier, store-wide sales, then track id.
-    filters = [(0, {"artist_id": a}) for a in artists] + [(1, {"genre_id": g}) for g in genres]
+def ranked(customer_id: int, filters: list[tuple[int, dict]], playable_only: bool) -> list[dict]:
+    # Lower tier first; within a tier, store-wide sales, then track id.
     rows = {}
     for tier, where in filters or [(0, {})]:
         for track in catalog.ranked_tracks(customer_id, **where):
@@ -97,51 +99,37 @@ def ranked(customer_id: int, artists: list[int], genres: list[int], playable_onl
     return sorted(keep, key=lambda t: (t["tier"], -t["sales"], t["track_id"]))[: config.RECOMMEND_LIMIT]
 
 
-def recommend(customer_id: int, mode: str, seed=None, seed_id=None, new_preferences=None) -> dict:
-    if mode not in MODES:
-        raise ValueError("unknown mode")
+def pick(text, given_id, kind: str) -> tuple[int | None, dict | None]:
+    """An id for the typed artist or genre, or a result asking the customer to choose."""
+    if given_id is not None:
+        return catalog.valid_id(given_id, f"{kind}_id"), None
+    if not text:
+        return None, None
+    found = resolver.resolve(text, catalog.names(kind))
+    return (found["id"], None) if found["status"] == "found" else (None, {**found, "kind": kind})
+
+
+def recommend(customer_id: int, artist=None, genre=None, artist_id=None, genre_id=None,
+              new_preferences=None) -> dict:
     prefs, unknown = update_preferences(customer_id, new_preferences)
     result = {"saved_preferences": prefs, "not_recognized": unknown}
-    partial = {a["album_id"]: a for a in catalog.partial_albums(customer_id)}
-    top = list(partial)[: config.RECOMMEND_LIMIT]
+    artist_id, problem = pick(artist, artist_id, "artist")
+    genre_id, genre_problem = pick(genre, genre_id, "genre")
+    if problem or genre_problem:
+        return {**result, **(problem or genre_problem)}
 
-    if mode == "complete_album":
-        if not seed and seed_id is None:
-            return {**result, "status": "ok", "offers": [offer_for(customer_id, partial[a]) for a in top]}
-        # A named album is matched against every album they started, not just the top few.
-        rows = [{"id": a["album_id"], "name": a["album"], "label": f"{a['album']} by {a['artist']}"}
-                for a in partial.values()]
-        found = ({"status": "found", "id": catalog.valid_id(seed_id, "seed_id")} if seed_id is not None
-                 else resolver.resolve(seed, rows))
-        if found["status"] == "found" and found["id"] not in partial:
-            found = {"status": "not_found", "text": seed}
-        if found["status"] != "found":
-            return {**result, **found}
-        return {**result, "status": "ok", "offers": [offer_for(customer_id, partial[found["id"]])]}
-
-    if mode == "for_me":
+    if artist_id or genre_id:
+        filters = [(0, {"artist_id": artist_id, "genre_id": genre_id})]
+    else:
         artists, genres = taste(customer_id, prefs)
-        question = None if artists or genres else next_question(prefs)
-        if question:
+        if not (artists or genres) and (question := next_question(prefs)):
             # Each slot is asked once, so a customer who skips it gets bestsellers next time.
             store.save_preferences(customer_id, {**prefs, "asked": [*prefs.get("asked", []), question["slot"]]})
             return {**result, **question}
-    else:
-        kind = "artist" if mode == "by_artist" else "track"
-        found = ({"status": "found", "id": catalog.valid_id(seed_id, "seed_id")} if seed_id is not None
-                 else resolver.resolve(seed, catalog.names(kind)))
-        if found["status"] != "found":
-            return {**result, **found}
-        if mode == "by_artist":
-            artists, genres = [found["id"]], []
-        else:
-            info = catalog.track_info(found["id"])
-            if info is None:
-                return {**result, "status": "not_found", "text": seed}
-            artists, genres = [info["artist_id"]], [info["genre_id"]]
+        filters = [(0, {"artist_id": a}) for a in artists] + [(1, {"genre_id": g}) for g in genres]
 
-    tracks = ranked(customer_id, artists, genres, playable_only=prefs.get("device") == "other")
-    albums = dict.fromkeys(t["album_id"] for t in tracks)
-    # Only albums among their top few to finish become offers, so every offer shown can be bought.
-    offers = [offer_for(customer_id, partial[a]) for a in albums if a in top]
+    tracks = ranked(customer_id, filters, playable_only=prefs.get("device") == "other")
+    # A completion is offered only when it fits what was asked for.
+    offers = [offer_for(customer_id, a) for a in completable(customer_id)
+              if artist_id in (None, a["artist_id"]) and genre_id in (None, a["genre_id"])]
     return {**result, "status": "ok", "tracks": tracks, "offers": offers}

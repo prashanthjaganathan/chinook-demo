@@ -172,8 +172,6 @@ def test_ranked_tracks_order_is_sales_then_id():
     assert {t["artist"] for t in ranked} == {"Iron Maiden"}
 
 
-def test_track_info_and_names():
-    assert catalog.track_info(1) == {"artist_id": 1, "genre_id": 1}
-    assert catalog.track_info(999999) is None
+def test_names_and_top_genres():
     assert {"id": 1, "name": "AC/DC", "label": "AC/DC"} in catalog.names("artist")
     assert len(catalog.top_genres()) == 5

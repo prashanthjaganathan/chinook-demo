@@ -84,7 +84,9 @@ counts AS (
     GROUP BY t.AlbumId
 )
 SELECT al.AlbumId AS album_id, al.Title AS album, ar.Name AS artist,
-       counts.owned_tracks, counts.total_tracks
+       counts.owned_tracks, counts.total_tracks, al.ArtistId AS artist_id,
+       (SELECT GenreId FROM Track WHERE AlbumId = al.AlbumId
+        GROUP BY GenreId ORDER BY COUNT(*) DESC, GenreId LIMIT 1) AS genre_id
 FROM counts
 JOIN Album al ON al.AlbumId = counts.AlbumId
 JOIN Artist ar ON ar.ArtistId = al.ArtistId
@@ -187,12 +189,6 @@ ORDER BY sales DESC, t.TrackId
 LIMIT :limit
 """
 
-# The artist and genre of one track.
-TRACK_INFO_SQL = """
-SELECT al.ArtistId AS artist_id, t.GenreId AS genre_id
-FROM Track t JOIN Album al ON al.AlbumId = t.AlbumId WHERE t.TrackId = ?
-"""
-
 # The store's best-selling genres, offered as choices to new customers.
 TOP_GENRES_SQL = """
 SELECT g.Name AS name FROM InvoiceLine il
@@ -226,11 +222,6 @@ def ranked_tracks(customer_id: int, artist_id=None, genre_id=None) -> list[dict]
     params = {"customer_id": valid_id(customer_id, "customer_id"), "artist_id": artist_id,
               "genre_id": genre_id, "limit": config.MAX_SEARCH_RESULTS}
     return with_money(query(RANKED_TRACKS_SQL, params))
-
-
-def track_info(track_id: int) -> dict | None:
-    rows = query(TRACK_INFO_SQL, (valid_id(track_id, "track_id"),))
-    return rows[0] if rows else None
 
 
 def top_genres() -> list[str]:

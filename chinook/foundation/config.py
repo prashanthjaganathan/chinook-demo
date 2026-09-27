@@ -25,7 +25,8 @@ def plays_anywhere(media_type: str) -> bool:
 def media_kind(media_type: str) -> str:
     return "video" if media_type in VIDEO_FORMATS else "audio"
 
-
+# Share of an album the customer must already own before its completion is offered.
+COMPLETION_MIN_OWNED = Decimal("0.4")
 RECOMMEND_LIMIT = 5
 MAX_PREFERENCE_ITEMS = 5
 ASK_DEVICE = "Do you listen on an Apple device or something else?"
@@ -88,6 +89,7 @@ AUTO_REFUND_LIMIT = Decimal("1.99")
 RECENT_REFUND_DAYS = 90
 MAX_RECENT_REFUNDS = 3  # at or above this, always staff review
 MAX_CANDIDATES = 5
+MAX_LISTED_PURCHASES = 20
 REFUND_MESSAGES = {
     "auto_approved": "Your refund is approved.",
     "needs_review": "I've sent this to our team to review. You'll hear back soon.",
