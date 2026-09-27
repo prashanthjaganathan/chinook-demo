@@ -106,7 +106,7 @@ def recommend(customer_id: int, mode: str, seed=None, seed_id=None, new_preferen
     top = list(partial)[: config.RECOMMEND_LIMIT]
 
     if mode == "complete_album":
-        if seed is None and seed_id is None:
+        if not seed and seed_id is None:
             return {**result, "status": "ok", "offers": [offer_for(customer_id, partial[a]) for a in top]}
         # A named album is matched against every album they started, not just the top few.
         rows = [{"id": a["album_id"], "name": a["album"], "label": f"{a['album']} by {a['artist']}"}

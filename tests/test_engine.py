@@ -119,6 +119,7 @@ def test_a_named_album_outside_the_top_five_still_gets_its_offer():
     assert [o["album"] for o in result["offers"]] == ["In Your Honor [Disc 1]"]
     assert engine.current_offer(48, result["offers"][0]["offer_id"])
     assert engine.recommend(48, "complete_album", "qwxzv")["status"] == "not_found"
+    assert len(engine.recommend(48, "complete_album", "")["offers"]) == config.RECOMMEND_LIMIT
 
 
 def test_recommendations_only_offer_albums_from_the_top_five():

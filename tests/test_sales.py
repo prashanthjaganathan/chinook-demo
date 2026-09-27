@@ -88,7 +88,7 @@ def calls(result, name):
 def test_live_what_should_i_finish():
     answer = say(live_graph(), "What should I finish?", thread="live-finish")["messages"][-1].text
 
-    assert "In Step" in answer and "4.75" in answer
+    assert "In Step" in answer and in_step_price() in answer
 
 
 @pytest.mark.live
