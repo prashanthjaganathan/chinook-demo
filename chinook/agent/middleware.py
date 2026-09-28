@@ -2,10 +2,12 @@ import asyncio
 import sqlite3
 from typing import NotRequired
 
+import langchain.agents.middleware.human_in_the_loop as hitl
 from langchain.agents import AgentState
 from langchain.agents.middleware import AgentMiddleware, hook_config
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.config import get_config
+from langgraph.types import interrupt
 from pydantic import BaseModel
 
 from chinook.agent import models
@@ -129,6 +131,22 @@ class MustUseATool(AgentMiddleware):
 
     async def awrap_model_call(self, request, handler):
         return await handler(self.forced(request))
+
+
+APPROVE_WORDS = {"approve", "approved", "yes", "y", "ok"}
+
+
+def plain_word_interrupt(request):
+    """Studio's resume box can send a bare word; any word but an approve word rejects."""
+    answer = interrupt(request)
+    if not isinstance(answer, str):
+        return answer
+    kind = "approve" if answer.strip().strip('"').lower() in APPROVE_WORDS else "reject"
+    return {"decisions": [{"type": kind}] * len(request["action_requests"])}
+
+
+# HumanInTheLoopMiddleware reads the resume through this module-level name.
+hitl.interrupt = plain_word_interrupt
 
 
 def refused_call(request, text: str) -> ToolMessage:
