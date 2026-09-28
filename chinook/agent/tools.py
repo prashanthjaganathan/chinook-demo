@@ -101,6 +101,7 @@ def buy_completion(runtime: ToolRuntime[CustomerContext], offer_id: str) -> dict
         store.request_key(str(thread_id), str(runtime.tool_call_id)), lines=lines,
         customer_id=customer_id, album_id=offer["album_id"], offer_id=offer_id,
         amount=str(offer["final_price"]))
+    outcomes.record_purchase(offer)
     return {"status": "confirmed", "album": offer["album"],
             "tracks": len(offer["missing_tracks"]), "amount": order["amount"]}
 

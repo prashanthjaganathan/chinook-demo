@@ -29,14 +29,30 @@ def refund_scores(status: str, action: str, amount: str) -> dict:
     }
 
 
-def record_refund(status: str, action: str, amount: str) -> None:
+def purchase_scores(offer: dict) -> dict:
+    return {
+        "completion_revenue": float(offer["final_price"]),
+        "completion_tracks_sold": len(offer["missing_tracks"]),
+        "completion_discount_given": float(offer["discount"]),
+    }
+
+
+def attach(label: tuple[str, str], scores: dict) -> None:
     run = get_current_run_tree()
     if run is None:
         return
     try:
-        client().create_feedback(run.trace_id, key="refund_band", value=status)
-        for key, score in refund_scores(status, action, amount).items():
+        client().create_feedback(run.trace_id, key=label[0], value=label[1])
+        for key, score in scores.items():
             client().create_feedback(run.trace_id, key=key, score=score)
     except Exception as error:
-        # A refund must never fail because the dashboard couldn't be updated.
-        log.warning("could not record refund outcome: %s", error)
+        # A refund or purchase must never fail because the dashboard couldn't be updated.
+        log.warning("could not record %s outcome: %s", label[0], error)
+
+
+def record_refund(status: str, action: str, amount: str) -> None:
+    attach(("refund_band", status), refund_scores(status, action, amount))
+
+
+def record_purchase(offer: dict) -> None:
+    attach(("purchase", "album_completion"), purchase_scores(offer))
