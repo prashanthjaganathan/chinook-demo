@@ -19,8 +19,10 @@ def offer_for(customer_id: int, album: dict) -> dict:
 
 
 def completable(customer_id: int) -> list[dict]:
+    # Chinook is read-only, so albums bought through the agent are excluded here.
+    ordered = store.ordered_albums(customer_id)
     return [a for a in catalog.partial_albums(customer_id)
-            if a["owned_tracks"] >= config.COMPLETION_MIN_OWNED * a["total_tracks"]]
+            if a["album_id"] not in ordered and a["owned_tracks"] >= config.COMPLETION_MIN_OWNED * a["total_tracks"]]
 
 
 def current_offer(customer_id: int, offer: str) -> dict | None:
@@ -70,7 +72,9 @@ def ids(names: list[str], kind: str) -> list[int]:
 
 
 def taste(customer_id: int, prefs: dict) -> tuple[list[int], list[int]]:
-    library = catalog.get_library(customer_id)
+    # Tracks bought through the agent count too; they live in the support store, not Chinook.
+    library = catalog.get_library(customer_id) + catalog.tracks(
+        [line["track_id"] for line in store.order_lines(customer_id)])
     artists = [a for a, _ in Counter(t["artist_id"] for t in library).most_common(3)]
     genres = [g for g, _ in Counter(t["genre_id"] for t in library).most_common(2)]
     # Library first; saved preferences fill the gaps.
@@ -95,7 +99,9 @@ def ranked(customer_id: int, filters: list[tuple[int, dict]], playable_only: boo
     for tier, where in filters or [(0, {})]:
         for track in catalog.ranked_tracks(customer_id, **where):
             rows.setdefault(track["track_id"], {**track, "tier": tier})
-    keep = [t for t in rows.values() if not playable_only or config.plays_anywhere(t["media_type"])]
+    ordered = store.ordered_albums(customer_id)
+    keep = [t for t in rows.values() if t["album_id"] not in ordered
+            and (not playable_only or config.plays_anywhere(t["media_type"]))]
     return sorted(keep, key=lambda t: (t["tier"], -t["sales"], t["track_id"]))[: config.RECOMMEND_LIMIT]
 
 
@@ -111,25 +117,44 @@ def pick(text, given_id, kind: str) -> tuple[int | None, dict | None]:
 
 def recommend(customer_id: int, artist=None, genre=None, artist_id=None, genre_id=None,
               new_preferences=None) -> dict:
+    # 1. Save anything new they told us (device, favourite genres or artists),
+    #    and keep a list of names we couldn't match to the catalog.
     prefs, unknown = update_preferences(customer_id, new_preferences)
     result = {"saved_preferences": prefs, "not_recognized": unknown}
+
+    # 2. Turn what they typed into catalog ids. "metalica" becomes Metallica's id.
+    #    If it's ambiguous or unknown, pick() hands back a problem instead of an id.
     artist_id, problem = pick(artist, artist_id, "artist")
     genre_id, genre_problem = pick(genre, genre_id, "genre")
     if problem or genre_problem:
+        # Stop here and let the agent ask: "did you mean X or Y?"
         return {**result, **(problem or genre_problem)}
 
+    # 3. Decide what to search for.
     if artist_id or genre_id:
+        # They named an artist or genre, so search exactly that.
         filters = [(0, {"artist_id": artist_id, "genre_id": genre_id})]
     else:
+        # They asked for "something", so use their own taste:
+        # their top artists and genres from what they've bought, plus saved preferences.
         artists, genres = taste(customer_id, prefs)
+
+        # A brand new customer has no taste yet, so ask a question instead of guessing.
         if not (artists or genres) and (question := next_question(prefs)):
-            # Each slot is asked once, so a customer who skips it gets bestsellers next time.
+            # Remember we asked, so we never ask the same thing twice.
             store.save_preferences(customer_id, {**prefs, "asked": [*prefs.get("asked", []), question["slot"]]})
             return {**result, **question}
+
+        # Favourite artists rank first (tier 0), favourite genres second (tier 1).
         filters = [(0, {"artist_id": a}) for a in artists] + [(1, {"genre_id": g}) for g in genres]
 
+    # 4a. Find the best tracks they don't own, ranked by tier, then store-wide sales.
+    #     On Android, drop anything Apple-locked (AAC, MPEG-4), because it wouldn't play.
     tracks = ranked(customer_id, filters, playable_only=prefs.get("device") == "other")
-    # A completion is offered only when it fits what was asked for.
+
+    # 4b. Add "finish this album" offers, but only for albums that match the request:
+    #     ask for AC/DC and you won't be offered a jazz album.
     offers = [offer_for(customer_id, a) for a in completable(customer_id)
               if artist_id in (None, a["artist_id"]) and genre_id in (None, a["genre_id"])]
+
     return {**result, "status": "ok", "tracks": tracks, "offers": offers}

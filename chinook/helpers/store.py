@@ -43,6 +43,18 @@ CREATE TABLE IF NOT EXISTS orders (
     amount TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS order_lines (
+    line_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_key TEXT NOT NULL,
+    customer_id INTEGER NOT NULL,
+    track_id INTEGER NOT NULL,
+    track TEXT NOT NULL,
+    artist TEXT NOT NULL,
+    media_type TEXT NOT NULL,
+    unit_price TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (request_key, track_id)
+);
 """
 MATCHED = ("customer_id", "invoice_line_id", "track_id", "action", "replacement_track_id")
 
@@ -161,9 +173,28 @@ def save_preferences(customer_id: int, preferences: dict) -> None:
             (catalog.valid_id(customer_id, "customer_id"), json.dumps(preferences)))
 
 
-def record_order(key: str, **fields) -> dict:
-    # Same key twice (a replayed approval) records one order.
+def record_order(key: str, lines=(), **fields) -> dict:
+    # Same key twice (a replayed approval) records one order and one set of lines.
     execute("""INSERT OR IGNORE INTO orders (request_key, customer_id, album_id, offer_id, amount)
                VALUES (:request_key, :customer_id, :album_id, :offer_id, :amount)""",
             {"request_key": key, **fields})
+    for line in lines:
+        execute("""INSERT OR IGNORE INTO order_lines
+                   (request_key, customer_id, track_id, track, artist, media_type, unit_price)
+                   VALUES (:request_key, :customer_id, :track_id, :track, :artist, :media_type, :unit_price)""",
+                {"request_key": key, "customer_id": fields["customer_id"], **line})
     return execute("SELECT * FROM orders WHERE request_key = ?", (key,))[0]
+
+
+def order_lines(customer_id: int) -> list[dict]:
+    return execute("SELECT * FROM order_lines WHERE customer_id = ? ORDER BY created_at DESC, line_id",
+                   (catalog.valid_id(customer_id, "customer_id"),))
+
+
+def orders(customer_id: int) -> list[dict]:
+    return execute("SELECT * FROM orders WHERE customer_id = ? ORDER BY created_at DESC",
+                   (catalog.valid_id(customer_id, "customer_id"),))
+
+
+def ordered_albums(customer_id: int) -> set[int]:
+    return {order["album_id"] for order in orders(customer_id)}

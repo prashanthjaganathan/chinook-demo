@@ -1,6 +1,10 @@
 {
   "$schema": "https://langgra.ph/schema.json",
   "dependencies": ["."],
-  "graphs": { "music_store_agent": "./chinook/agent/team.py:graph" },
+  "graphs": {
+    "supervisor": "./chinook/agent/team.py:graph",
+    "music_recommendation": "./chinook/agent/team.py:music_graph",
+    "invoice_support": "./chinook/agent/team.py:support_graph"
+  },
   "env": ".env"
 }

@@ -98,6 +98,13 @@ def test_reject_through_the_supervisor_writes_nothing():
     assert store.open_requests(54) == []
 
 
+def test_a_plain_word_resume_works_through_the_supervisor():
+    graph, config, _ = approval_run()
+    graph.invoke(Command(resume="approve"), config=config, context=CustomerContext(customer_id=54))
+
+    assert len(store.open_requests(54)) == 1
+
+
 def test_graph_entrypoint_has_no_checkpointer(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 

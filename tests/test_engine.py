@@ -130,3 +130,22 @@ def test_current_offer_matches_only_a_fresh_own_completable_offer():
     assert engine.current_offer(48, f"{IN_STEP}-0000000000") is None
     assert engine.current_offer(48, engine.offer_for(48, below)["offer_id"]) is None
     assert engine.current_offer(48, "junk") is None
+
+
+def test_tracks_bought_through_the_agent_shape_taste():
+    offer = next(o for o in engine.recommend(48)["offers"] if o["album_id"] == IN_STEP)
+    assert engine.taste(48, {}) == ([127, 84, 133], [1, 4])
+
+    store.record_order("k1", customer_id=48, album_id=IN_STEP, offer_id=offer["offer_id"], amount="1",
+                       lines=[{"track_id": t["track_id"], "track": t["track"], "artist": offer["artist"],
+                               "media_type": t["media_type"], "unit_price": "0.1"} for t in offer["missing_tracks"]])
+
+    # Stevie Ray Vaughan becomes the top artist, and Blues joins the top genres.
+    assert engine.taste(48, {}) == ([133, 127, 84], [1, 6])
+
+
+def test_track_lookup_matches_library_rows_and_ignores_empty():
+    row = catalog.get_library(48)[0]
+
+    assert catalog.tracks([row["track_id"]]) == [row]
+    assert catalog.tracks([]) == []

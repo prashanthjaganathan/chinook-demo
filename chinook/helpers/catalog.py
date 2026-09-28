@@ -1,4 +1,5 @@
 import functools
+import json
 import sqlite3
 from decimal import Decimal
 from pathlib import Path
@@ -69,6 +70,20 @@ JOIN Genre g ON g.GenreId = t.GenreId
 JOIN MediaType m ON m.MediaTypeId = t.MediaTypeId
 WHERE i.CustomerId = ?
 ORDER BY ar.Name, al.Title, t.Name
+"""
+
+# The same rows as LIBRARY_SQL, for tracks bought through the agent (kept outside Chinook).
+TRACKS_SQL = """
+SELECT
+    t.TrackId AS track_id, t.Name AS track, t.AlbumId AS album_id, al.Title AS album,
+    ar.Name AS artist, g.Name AS genre, m.Name AS media_type, t.UnitPrice AS unit_price,
+    al.ArtistId AS artist_id, t.GenreId AS genre_id
+FROM Track t
+JOIN Album al ON al.AlbumId = t.AlbumId
+JOIN Artist ar ON ar.ArtistId = al.ArtistId
+JOIN Genre g ON g.GenreId = t.GenreId
+JOIN MediaType m ON m.MediaTypeId = t.MediaTypeId
+WHERE t.TrackId IN (SELECT value FROM json_each(?))
 """
 
 # Albums the customer started but did not finish, closest to complete first.
@@ -202,6 +217,11 @@ PHONES_SQL = "SELECT CustomerId AS customer_id, Phone AS phone FROM Customer WHE
 
 def get_library(customer_id: int) -> list[dict]:
     return with_money(query(LIBRARY_SQL, (valid_id(customer_id, "customer_id"),)))
+
+
+def tracks(track_ids: list[int]) -> list[dict]:
+    ids = [valid_id(track_id, "track_id") for track_id in track_ids]
+    return with_money(query(TRACKS_SQL, (json.dumps(ids),))) if ids else []
 
 
 def partial_albums(customer_id: int) -> list[dict]:

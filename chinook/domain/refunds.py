@@ -14,13 +14,22 @@ def label(line: dict) -> str:
     return f"{line['track']} by {line['artist']}, bought {line['invoice_date']}, ${line['unit_price']}"
 
 
+def purchases(customer_id: int) -> list[dict]:
+    """Chinook purchases plus tracks bought through the agent, newest first."""
+    ordered = [{"invoice_line_id": f"o{l['line_id']}", "invoice_id": f"o-{l['request_key']}",
+                "invoice_date": l["created_at"][:10], "track_id": l["track_id"], "track": l["track"],
+                "artist": l["artist"], "media_type": l["media_type"], "unit_price": catalog.money(l["unit_price"])}
+               for l in store.order_lines(customer_id)]
+    return sorted(ordered + catalog.customer_purchases(customer_id), key=lambda l: l["invoice_date"], reverse=True)
+
+
 def closeness(text: str, value: str) -> float:
     a, b = resolver.normalize(text), resolver.normalize(value)
     return 1.0 if a and a in b else resolver.ratio(a, b)
 
 
 def find(customer_id: int, track=None, artist=None, wont_play_on=None, latest=False) -> dict:
-    lines = catalog.customer_purchases(customer_id)
+    lines = purchases(customer_id)
     # With nothing to go on, show their latest order rather than guess.
     if lines and (latest or not (track or artist or wont_play_on)):
         lines = [line for line in lines if line["invoice_id"] == lines[0]["invoice_id"]]
@@ -46,14 +55,13 @@ def find(customer_id: int, track=None, artist=None, wont_play_on=None, latest=Fa
 def purchase_for_ref(customer_id: int, ref: str) -> dict | None:
     """A ref only resolves for the customer it was issued to."""
     line_id = str(ref).split("-", 1)[0]
-    line = next((l for l in catalog.customer_purchases(customer_id)
-                 if str(l["invoice_line_id"]) == line_id), None)
+    line = next((l for l in purchases(customer_id) if str(l["invoice_line_id"]) == line_id), None)
     return line if line and purchase_ref(customer_id, line["invoice_line_id"]) == ref else None
 
 
 def checklist(customer_id: int, line: dict, reason: str, device, recent: int) -> dict:
     locked = not config.plays_anywhere(line["media_type"])
-    bought = [l for l in catalog.customer_purchases(customer_id) if l["track_id"] == line["track_id"]]
+    bought = [l for l in purchases(customer_id) if l["track_id"] == line["track_id"]]
     return {
         "reason_is_refundable": reason in config.REFUNDABLE_REASONS,
         # Protected files play on Apple devices, so only a non-Apple device explains the problem.

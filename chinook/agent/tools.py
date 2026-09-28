@@ -4,10 +4,11 @@ from typing import Literal
 from langchain.tools import ToolRuntime, tool
 from pydantic import BaseModel
 
+from chinook.agent import outcomes
 from chinook.domain import engine, refunds
 from chinook.foundation import config
 from chinook.foundation.context import CustomerContext
-from chinook.helpers import catalog, store
+from chinook.helpers import catalog, pricing, store
 
 
 def readable(value):
@@ -89,14 +90,29 @@ def buy_completion(runtime: ToolRuntime[CustomerContext], offer_id: str) -> dict
         return {"error": config.NO_IDENTITY}
     offer = engine.current_offer(customer_id, offer_id)
     if offer is None:
-        return {"error": config.OFFER_CHANGED}
+        bought = str(offer_id).split("-", 1)[0] in {str(a) for a in store.ordered_albums(customer_id)}
+        return {"error": config.ALREADY_BOUGHT if bought else config.OFFER_CHANGED}
     thread_id = (runtime.config or {}).get("configurable", {}).get("thread_id", "")
+    prices = pricing.split_evenly(offer["final_price"], len(offer["missing_tracks"]))
+    lines = [{"track_id": t["track_id"], "track": t["track"], "artist": offer["artist"],
+              "media_type": t["media_type"], "unit_price": str(price)}
+             for t, price in zip(offer["missing_tracks"], prices)]
     order = store.record_order(
-        store.request_key(str(thread_id), str(runtime.tool_call_id)),
+        store.request_key(str(thread_id), str(runtime.tool_call_id)), lines=lines,
         customer_id=customer_id, album_id=offer["album_id"], offer_id=offer_id,
         amount=str(offer["final_price"]))
+    outcomes.record_purchase(offer)
     return {"status": "confirmed", "album": offer["album"],
             "tracks": len(offer["missing_tracks"]), "amount": order["amount"]}
+
+
+def describe_purchase(tool_call, state, runtime) -> str:
+    """The confirmation the customer sees: the album, how many tracks, and the price."""
+    customer_id = customer_of(runtime)
+    offer = engine.current_offer(customer_id, tool_call["args"].get("offer_id", "")) if customer_id else None
+    if offer is None:
+        return "This offer is no longer valid."
+    return f"Buy {len(offer['missing_tracks'])} tracks on {offer['album']} for ${offer['final_price']}?"
 
 
 RefundReason = Literal["wont_play", "bought_by_mistake", "didnt_like_it", "other", "not_given"]
@@ -127,7 +143,7 @@ def list_purchases(runtime: ToolRuntime[CustomerContext]) -> dict:
     customer_id = customer_of(runtime)
     if customer_id is None:
         return {"error": config.NO_IDENTITY}
-    lines = catalog.customer_purchases(customer_id)
+    lines = refunds.purchases(customer_id)
     return readable({
         "total": len(lines),
         "purchases": [{"purchase_ref": refunds.purchase_ref(customer_id, line["invoice_line_id"]),
@@ -150,28 +166,43 @@ def request_refund(
 
     The customer confirms first. The store's refund policy decides the outcome.
     """
+    # 1. Who's asking? Comes from the session, never from the chat.
     customer_id = customer_of(runtime)
     if customer_id is None:
         return {"error": config.NO_IDENTITY}
+
+    # 2. Is it theirs? A purchase_ref only works for the customer it was issued to,
+    #    so someone else's purchase and a made-up one get the same answer.
     line = refunds.purchase_for_ref(customer_id, purchase_ref)
     if line is None:
         return {"error": config.NOT_YOUR_PURCHASE}
+
+    # 3. Is the request sensible?
     if details and len(details) > config.MAX_REASON:
         return {"error": f"details must be at most {config.MAX_REASON} characters."}
+    # A swap needs a replacement track; a plain refund must not name one.
     if (action == "swap") != (replacement_track_id is not None):
         return {"error": "a swap needs a replacement track, and a refund cannot name one."}
+
+    # 4. Already in progress? One live request per purchase, so no double refunds.
+    #    Rejected ones don't count, which is what lets a customer appeal.
     if store.has_live_request(line["invoice_line_id"]):
         return {"error": config.ALREADY_REQUESTED}
 
+    # 5. Decide.
     if action == "swap":
+        # Replacement must play anywhere, cost the same, and not already be owned.
         problem = catalog.check_swap(customer_id, line["track_id"], replacement_track_id)
         if problem:
             return {"error": problem}
-        # A valid swap moves no money, so it is approved without scoring.
+        # A valid swap moves no money, so it's approved without scoring.
         decision = {"status": "auto_approved", "score": None, "items": {}, "policy": config.REFUND_POLICY_VERSION}
     else:
+        # The policy checklist scores it: auto approve, staff review, or auto reject.
         decision = refunds.decide(customer_id, line, reason, device)
 
+    # Save the decision. The key comes from this conversation and this exact tool call,
+    # so replaying the same approval never creates a second refund.
     thread_id = (runtime.config or {}).get("configurable", {}).get("thread_id", "")
     try:
         store.record(
@@ -181,7 +212,13 @@ def request_refund(
             reason=reason if not details else f"{reason}: {details.strip()}",
             status=decision["status"], score=decision["score"], policy=decision["policy"])
     except Exception:
+        # If it couldn't be saved, say so honestly. Never claim a refund that didn't happen.
         return {"error": config.REQUEST_NOT_DONE}
+
+    # Report the outcome to the dashboard. Only after saving, so we never count a phantom refund.
+    outcomes.record_refund(decision["status"], action, str(line["unit_price"]))
+
+    # Tell the model exactly what to say, plus which policy checks failed, so it can explain.
     message = config.SWAP_APPROVED if action == "swap" else config.REFUND_MESSAGES[decision["status"]]
     return {"status": decision["status"], "action": action, "track": line["track"],
             "amount": str(line["unit_price"]), "message": message,
@@ -199,4 +236,4 @@ def describe_refund(tool_call, state, runtime) -> str:
     return f"{verb} {line['track']} (${line['unit_price']}, bought {line['invoice_date']}) because {why}?"
 
 
-APPROVAL_TEXT = {"request_refund": describe_refund}
+APPROVAL_TEXT = {"buy_completion": describe_purchase, "request_refund": describe_refund}

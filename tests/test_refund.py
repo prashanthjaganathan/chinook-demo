@@ -139,17 +139,27 @@ def test_approval_allows_only_approve_and_reject():
 
     assert set(allowed["allowed_decisions"] if isinstance(allowed, dict) else allowed.allowed_decisions) == {
         "approve", "reject"}
-    assert team.approval(team.spec_named("music_recommendation")) == []
+    assert team.approval(team.spec_named("music_recommendation"))[0].interrupt_on["buy_completion"]
 
 
-@pytest.mark.parametrize("bad", ["", {"decisions": "approve"}])
-def test_a_malformed_resume_breaks_the_thread_for_good(bad):
+@pytest.mark.parametrize("word, written", [
+    ("approve", 1), (" Yes ", 1), ('"approve"', 1), ("reject", 0), ("no", 0), ("", 0),
+])
+def test_a_plain_word_resume_approves_or_rejects(word, written):
+    agent = approval_agent()
+    _, config_ = start(agent)
+    resume(agent, config_, word)
+
+    assert len(store.open_requests(54)) == written
+
+
+def test_a_malformed_resume_breaks_the_thread_for_good():
     # Known LangChain behaviour: the bad payload is checkpointed and every later resume replays it.
     agent = approval_agent()
     _, config_ = start(agent)
 
     with pytest.raises(Exception):
-        resume(agent, config_, bad)
+        resume(agent, config_, {"decisions": "approve"})
     with pytest.raises(Exception):
         resume(agent, config_, {"decisions": [{"type": "approve"}]})
     assert store.open_requests(54) == []

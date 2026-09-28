@@ -46,11 +46,25 @@ def in_step_price():
     return str(engine.recommend(48)["offers"][0]["final_price"])
 
 
-def test_a_purchase_is_recorded_once_without_an_approval_pause():
-    result = say(supervisor(buys_the_first_offer), "yes, buy it")
+def test_a_purchase_waits_for_a_readable_confirmation_then_records_one_order():
+    price = in_step_price()
+    graph = supervisor(buys_the_first_offer)
+    paused = say(graph, "yes, buy it")
 
-    assert "__interrupt__" not in result
-    assert [(o["album_id"], o["amount"]) for o in orders()] == [(205, in_step_price())]
+    request = paused["__interrupt__"][0].value["action_requests"][0]
+    assert request["description"] == f"Buy 6 tracks on In Step for ${price}?"
+    assert orders() == []
+
+    say(graph, Command(resume={"decisions": [{"type": "approve"}]}))
+    assert [(o["album_id"], o["amount"]) for o in orders()] == [(205, price)]
+
+
+def test_a_rejected_purchase_records_nothing():
+    graph = supervisor(buys_the_first_offer)
+    say(graph, "yes, buy it")
+    say(graph, Command(resume={"decisions": [{"type": "reject"}]}))
+
+    assert orders() == []
 
 
 def test_the_specialist_sees_recent_turns_of_the_conversation():
@@ -121,10 +135,11 @@ def test_live_new_customer_is_asked_then_recommended(monkeypatch):
 @pytest.mark.live
 @live
 def test_live_yes_buy_it_records_the_order():
-    graph = live_graph()
+    graph, price = live_graph(), in_step_price()
     say(graph, "What am I closest to finishing?", thread="live-buy")
-    done = say(graph, "Yes, buy it.", thread="live-buy")
+    paused = say(graph, "Yes, buy it.", thread="live-buy")
 
-    assert "__interrupt__" not in done
-    assert [(o["album_id"], o["amount"]) for o in orders()] == [(205, in_step_price())]
-    assert in_step_price() in done["messages"][-1].text
+    assert paused["__interrupt__"][0].value["action_requests"][0]["description"] == f"Buy 6 tracks on In Step for ${price}?"
+    done = say(graph, Command(resume={"decisions": [{"type": "approve"}]}), thread="live-buy")
+    assert [(o["album_id"], o["amount"]) for o in orders()] == [(205, price)]
+    assert price in done["messages"][-1].text

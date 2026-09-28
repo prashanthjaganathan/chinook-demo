@@ -39,3 +39,9 @@ def test_floats_and_negatives_are_rejected():
     for value in (0.99, "0.99", None, Decimal("-1"), True):
         with pytest.raises(ValueError):
             pricing.completion_price([value])
+
+
+def test_a_bundle_price_splits_into_shares_that_add_up_exactly():
+    assert pricing.split_evenly(Decimal("1.00"), 3) == [Decimal("0.33"), Decimal("0.33"), Decimal("0.34")]
+    shares = pricing.split_evenly(Decimal("4.16"), 6)
+    assert sum(shares) == Decimal("4.16") and max(shares) - min(shares) <= Decimal("0.05")
