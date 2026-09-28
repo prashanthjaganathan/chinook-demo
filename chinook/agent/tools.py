@@ -166,28 +166,43 @@ def request_refund(
 
     The customer confirms first. The store's refund policy decides the outcome.
     """
+    # 1. Who's asking? Comes from the session, never from the chat.
     customer_id = customer_of(runtime)
     if customer_id is None:
         return {"error": config.NO_IDENTITY}
+
+    # 2. Is it theirs? A purchase_ref only works for the customer it was issued to,
+    #    so someone else's purchase and a made-up one get the same answer.
     line = refunds.purchase_for_ref(customer_id, purchase_ref)
     if line is None:
         return {"error": config.NOT_YOUR_PURCHASE}
+
+    # 3. Is the request sensible?
     if details and len(details) > config.MAX_REASON:
         return {"error": f"details must be at most {config.MAX_REASON} characters."}
+    # A swap needs a replacement track; a plain refund must not name one.
     if (action == "swap") != (replacement_track_id is not None):
         return {"error": "a swap needs a replacement track, and a refund cannot name one."}
+
+    # 4. Already in progress? One live request per purchase, so no double refunds.
+    #    Rejected ones don't count, which is what lets a customer appeal.
     if store.has_live_request(line["invoice_line_id"]):
         return {"error": config.ALREADY_REQUESTED}
 
+    # 5. Decide.
     if action == "swap":
+        # Replacement must play anywhere, cost the same, and not already be owned.
         problem = catalog.check_swap(customer_id, line["track_id"], replacement_track_id)
         if problem:
             return {"error": problem}
-        # A valid swap moves no money, so it is approved without scoring.
+        # A valid swap moves no money, so it's approved without scoring.
         decision = {"status": "auto_approved", "score": None, "items": {}, "policy": config.REFUND_POLICY_VERSION}
     else:
+        # The policy checklist scores it: auto approve, staff review, or auto reject.
         decision = refunds.decide(customer_id, line, reason, device)
 
+    # Save the decision. The key comes from this conversation and this exact tool call,
+    # so replaying the same approval never creates a second refund.
     thread_id = (runtime.config or {}).get("configurable", {}).get("thread_id", "")
     try:
         store.record(
@@ -197,8 +212,13 @@ def request_refund(
             reason=reason if not details else f"{reason}: {details.strip()}",
             status=decision["status"], score=decision["score"], policy=decision["policy"])
     except Exception:
+        # If it couldn't be saved, say so honestly. Never claim a refund that didn't happen.
         return {"error": config.REQUEST_NOT_DONE}
+
+    # Report the outcome to the dashboard. Only after saving, so we never count a phantom refund.
     outcomes.record_refund(decision["status"], action, str(line["unit_price"]))
+
+    # Tell the model exactly what to say, plus which policy checks failed, so it can explain.
     message = config.SWAP_APPROVED if action == "swap" else config.REFUND_MESSAGES[decision["status"]]
     return {"status": decision["status"], "action": action, "track": line["track"],
             "amount": str(line["unit_price"]), "message": message,
