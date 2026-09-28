@@ -13,7 +13,7 @@ from langchain.agents.middleware import (
 from langchain.tools import ToolRuntime, tool
 from langchain_core.messages import AIMessage, HumanMessage
 
-from chinook.agent import models, observability, prompts, tools
+from chinook.agent import models, prompts, tools
 from chinook.agent.middleware import (
     AuthMiddleware,
     MustUseATool,
@@ -35,7 +35,7 @@ from chinook.foundation import config
 from chinook.foundation.context import CustomerContext
 
 load_dotenv()
-observability.enable_masking()
+# observability.enable_masking()
 
 
 @dataclass(frozen=True)
@@ -173,3 +173,12 @@ def build_supervisor(checkpointer=None, model=None, subagent_model=None, specs=S
 def graph():
     """Studio entrypoint. The Agent Server adds its own checkpointer, which HITL uses; chat.py passes one."""
     return build_supervisor()
+
+def music_graph():
+    """Studio entrypoint for the music specialist on its own."""
+    return build_subagent(spec_named("music_recommendation"))
+
+
+def support_graph():
+    """Studio entrypoint for the support specialist on its own."""
+    return build_subagent(spec_named("invoice_support"))

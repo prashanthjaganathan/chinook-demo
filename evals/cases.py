@@ -100,6 +100,9 @@ def support() -> list[dict]:
     locked = next(line for line in lines if not config.plays_anywhere(line["media_type"]))
     plain = next(line for line in lines if config.plays_anywhere(line["media_type"]))
 
+    video_owner, video = next((owner, line) for owner in range(1, 60) for line in catalog.customer_purchases(owner)
+                              if config.media_kind(line["media_type"]) == "video")
+
     def ref(line):
         return refunds.purchase_ref(c, line["invoice_line_id"])
 
@@ -120,4 +123,7 @@ def support() -> list[dict]:
         case("swap_offered", c, f"can I swap {locked['track']} for something that plays on Android?",
              must_call=["search_catalog"]),
         case("foreign_invoice", c, "refund invoice 293", must_not_call=[REFUND]),
+        # Every video is DRM-protected, so there is nothing to swap it for.
+        case("swap_video", video_owner, f"{video['track']} won't play on my Android, can you swap it?",
+             must_not_call=["search_catalog"]),
     ]

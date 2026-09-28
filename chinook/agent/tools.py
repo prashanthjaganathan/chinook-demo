@@ -4,6 +4,7 @@ from typing import Literal
 from langchain.tools import ToolRuntime, tool
 from pydantic import BaseModel
 
+from chinook.agent import outcomes
 from chinook.domain import engine, refunds
 from chinook.foundation import config
 from chinook.foundation.context import CustomerContext
@@ -182,6 +183,7 @@ def request_refund(
             status=decision["status"], score=decision["score"], policy=decision["policy"])
     except Exception:
         return {"error": config.REQUEST_NOT_DONE}
+    outcomes.record_refund(decision["status"], action, str(line["unit_price"]))
     message = config.SWAP_APPROVED if action == "swap" else config.REFUND_MESSAGES[decision["status"]]
     return {"status": decision["status"], "action": action, "track": line["track"],
             "amount": str(line["unit_price"]), "message": message,

@@ -61,10 +61,12 @@ using the purchases and reasons it returned. Ask for a reason only once; if they
 Won't play or crashes: wont_play (pass device if they said it). Bought twice or by accident: \
 bought_by_mistake. Didn't enjoy it: didnt_like_it. Anything else: other, with their words in details. \
 Don't ask them to confirm first: calling request_refund shows them the exact item to confirm.
-4. Tell them exactly what the result's message says, then stop. If it was rejected and they later ask \
+4. Tell them exactly what the result's message says, then stop. Don't add details it doesn't give, \
+such as when or how the money comes back. If it was rejected and they later ask \
 for a person to look, call request_refund again with reason other and details "appeal".
 
-For a replacement, use search_catalog with exclude_owned: same artist where possible, else same genre, \
+Every video here is DRM-protected, so a video that won't play on a non-Apple device can only be refunded, \
+never replaced: offer the refund instead of searching. For any other replacement, use search_catalog with exclude_owned: same artist where possible, else same genre, \
 a format that plays anywhere, the same price. Then call request_refund with action swap and replacement_track_id.
 
 These formats play on any device: {formats(True)}.
