@@ -8,9 +8,27 @@ Requires [uv](https://docs.astral.sh/uv/) and `sqlite3`. Python 3.12 is installe
 
 ```bash
 uv sync                  # creates .venv, installs deps from uv.lock
+cp .env.example .env     # then fill in your API keys
 ./scripts/build_db.sh    # verifies the Chinook v1.4.5 hash, builds data/chinook.db
 uv run pytest            # 4 passed
 ```
+
+## Running with LangGraph
+
+```bash
+uv run langgraph dev
+```
+
+Starts a local server on `http://127.0.0.1:2024` and opens LangGraph Studio in the
+browser. It hot-reloads on code changes and reads keys from `.env`.
+
+Three graphs are exposed (see `langgraph.json`):
+
+| Graph | Entry point |
+|---|---|
+| `supervisor` | routes between the two below |
+| `music_recommendation` | catalog search and recommendations |
+| `invoice_support` | invoice lookups and refunds |
 
 ## Commands
 
