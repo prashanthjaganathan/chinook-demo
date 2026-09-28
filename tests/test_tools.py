@@ -4,6 +4,7 @@ from helpers import runtime_for
 
 from chinook.agent.tools import (
     buy_completion,
+    describe_purchase,
     find_purchases,
     list_purchases,
     readable,
@@ -97,3 +98,58 @@ def test_list_purchases_shows_only_own_purchases_newest_first_with_usable_refs()
     assert listed["purchases"][0]["label"] == refunds.label(lines[0])
     assert all(refunds.purchase_for_ref(54, p["purchase_ref"]) for p in listed["purchases"])
     assert not any(refunds.purchase_for_ref(1, p["purchase_ref"]) for p in listed["purchases"])
+
+
+def test_a_bought_album_is_not_offered_again_and_its_tracks_are_listed_one_by_one():
+    offer = in_step_offer()
+    run(buy_completion, 48, offer_id=offer["offer_id"])
+
+    assert "In Step" not in {o["album"] for o in run(recommend_engine, 48)["offers"]}
+    again = buy_completion.invoke({"runtime": runtime_for(48, call="c2"), "offer_id": offer["offer_id"]})
+    assert again == {"error": config.ALREADY_BOUGHT}
+
+    listed = run(list_purchases, 48)["purchases"][: len(offer["missing_tracks"])]
+    assert [p["label"].split(" by ")[0] for p in listed] == [t["track"] for t in offer["missing_tracks"]]
+    assert sum(Decimal(refunds.purchase_for_ref(48, p["purchase_ref"])["unit_price"]) for p in listed) == Decimal(
+        offer["final_price"])
+
+
+def test_a_replayed_purchase_records_its_tracks_once():
+    offer = in_step_offer()
+    run(buy_completion, 48, offer_id=offer["offer_id"])
+    run(buy_completion, 48, offer_id=offer["offer_id"])
+
+    assert len(store.order_lines(48)) == len(offer["missing_tracks"])
+
+
+def test_one_bought_track_can_be_refunded_at_the_price_paid():
+    offer = in_step_offer()
+    run(buy_completion, 48, offer_id=offer["offer_id"])
+    track = offer["missing_tracks"][0]["track"]
+    found = run(find_purchases, 48, track=track)
+    ref = found["purchases"][0]["purchase_ref"]
+    paid = str(refunds.purchase_for_ref(48, ref)["unit_price"])
+
+    refund = run(request_refund, 48, purchase_ref=ref, reason="bought_by_mistake")
+    assert (refund["track"], refund["amount"]) == (track, paid)
+    assert paid != str(offer["missing_tracks"][0]["unit_price"])
+    assert run(request_refund, 48, purchase_ref=ref, reason="bought_by_mistake") == {"error": config.ALREADY_REQUESTED}
+    assert refunds.purchase_for_ref(54, ref) is None
+
+
+def test_tracks_from_a_bought_album_are_not_recommended():
+    offer = in_step_offer()
+    artist = offer["artist_id"]
+    before = {t["album_id"] for t in run(recommend_engine, 48, artist_id=artist)["tracks"]}
+    run(buy_completion, 48, offer_id=offer["offer_id"])
+    after = {t["album_id"] for t in run(recommend_engine, 48, artist_id=artist)["tracks"]}
+
+    assert offer["album_id"] in before and offer["album_id"] not in after
+
+
+def test_the_purchase_confirmation_is_readable():
+    offer = in_step_offer()
+    tool_call = {"args": {"offer_id": offer["offer_id"]}}
+
+    assert describe_purchase(tool_call, {}, runtime_for(48)) == f"Buy 6 tracks on In Step for ${offer['final_price']}?"
+    assert describe_purchase(tool_call, {}, runtime_for(54)) == "This offer is no longer valid."

@@ -55,6 +55,7 @@ SUBAGENTS = (
         "bought, including what they're closest to finishing.",
         prompts.MUSIC_RECOMMENDATION_PROMPT,
         (recommend_engine, buy_completion),
+        approvals=("buy_completion",),
         extras=(MustUseATool,),
     ),
     AgentSpec(

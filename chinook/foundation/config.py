@@ -31,6 +31,7 @@ RECOMMEND_LIMIT = 5
 MAX_PREFERENCE_ITEMS = 5
 ASK_DEVICE = "Do you listen on an Apple device or something else?"
 ASK_GENRES = "What kinds of music do you like?"
+ALREADY_BOUGHT = "You've already bought the rest of that album."
 OFFER_CHANGED = "That offer has changed. Ask for the album again to get the current price."
 
 RESOLVE_CUTOFF = 0.8

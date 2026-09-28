@@ -19,8 +19,10 @@ def offer_for(customer_id: int, album: dict) -> dict:
 
 
 def completable(customer_id: int) -> list[dict]:
+    # Chinook is read-only, so albums bought through the agent are excluded here.
+    ordered = store.ordered_albums(customer_id)
     return [a for a in catalog.partial_albums(customer_id)
-            if a["owned_tracks"] >= config.COMPLETION_MIN_OWNED * a["total_tracks"]]
+            if a["album_id"] not in ordered and a["owned_tracks"] >= config.COMPLETION_MIN_OWNED * a["total_tracks"]]
 
 
 def current_offer(customer_id: int, offer: str) -> dict | None:
@@ -95,7 +97,9 @@ def ranked(customer_id: int, filters: list[tuple[int, dict]], playable_only: boo
     for tier, where in filters or [(0, {})]:
         for track in catalog.ranked_tracks(customer_id, **where):
             rows.setdefault(track["track_id"], {**track, "tier": tier})
-    keep = [t for t in rows.values() if not playable_only or config.plays_anywhere(t["media_type"])]
+    ordered = store.ordered_albums(customer_id)
+    keep = [t for t in rows.values() if t["album_id"] not in ordered
+            and (not playable_only or config.plays_anywhere(t["media_type"]))]
     return sorted(keep, key=lambda t: (t["tier"], -t["sales"], t["track_id"]))[: config.RECOMMEND_LIMIT]
 
 
